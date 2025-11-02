@@ -1,0 +1,9 @@
+NEED: ferrite cores
+
+0) RUN ON RASPBERRY PI!
+    - Otherwise this doesn't work overnight!
+    - Need to run both humidifier and thermostat
+    - SHOULD just work, but we'll see...
+    - Ugh... do ssh disk syncing, so we can still view metrics locally
+
+1) Floor plan with visualized metrics (not over time, but we can seek times to see them change)

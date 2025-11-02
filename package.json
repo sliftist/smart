@@ -1,0 +1,22 @@
+{
+  "name": "radio",
+  "version": "0.0.0",
+  "description": "Node script to control RTL-SDR devices",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "start": "start \"\" /b cmd /c \"yarn humidifer\" & start \"\" /b cmd /c \"yarn thermostat\"",
+    "thermostat": "yarn log thermostat yarn typenode ./thermostat.ts",
+    "humidifer": "yarn log humidifer yarn typenode ./humidifer.ts",
+    "test": "yarn typenode ./test.ts",
+    "log": "yarn typenode ./log.ts"
+  },
+  "dependencies": {
+    "mobx": "^6.15.0",
+    "socket-function": "^0.153.0",
+    "tp-link-tapo-connect": "^2.0.8",
+    "typedev": "^0.4.0",
+    "typenode": "^5.12.0",
+    "unofficial-rtl_433-binaries": "^25.2.2"
+  }
+}

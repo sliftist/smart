@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radio Logs Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        .controls {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background: #0052a3;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .date-range-selector {
+            margin-top: 15px;
+        }
+
+        .date-inputs {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .date-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .date-input-group label {
+            font-size: 12px;
+            color: #888;
+        }
+
+        input[type="datetime-local"] {
+            background: #3a3a3a;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        input[type="datetime-local"]:focus {
+            outline: none;
+            border-color: #0066cc;
+        }
+
+        .quick-select-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .metrics-selector {
+            margin-top: 15px;
+        }
+
+        .metrics-selector label {
+            display: inline-block;
+            margin-right: 20px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .metrics-selector input[type="checkbox"] {
+            margin-right: 5px;
+            cursor: pointer;
+        }
+
+        .chart-container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 600px;
+        }
+
+        canvas {
+            background: #1a1a1a;
+            border-radius: 4px;
+        }
+
+        .info {
+            color: #888;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .error {
+            background: #ff4444;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #2a2a2a;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #fff;
+            font-size: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 32px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            margin: 0;
+        }
+
+        .modal-close:hover {
+            color: #fff;
+            background: none;
+        }
+
+        .modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .label-input-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .label-input-group label {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .label-input-group input {
+            background: #3a3a3a;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .label-input-group input:focus {
+            outline: none;
+            border-color: #0066cc;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid #444;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <div style="display: flex; flex-direction: row; gap: 10px; align-items: center;">
+                <button id="selectFolder">Select Logs Folder</button>
+                <button id="labelIds" style="display: none;">Label IDs</button>
+                <div id="folderInfo" class="info"></div>
+            </div>
+            
+            <div id="dateRangeContainer" style="display: none;" class="date-range-selector">
+                <h3 style="margin-bottom: 10px;">Select Date Range:</h3>
+                <div style="margin-bottom: 10px; display: flex; gap: 20px; flex-wrap: wrap;">
+                    <label style="cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="liveRangeCheckbox" style="cursor: pointer; margin-right: 5px;">
+                        <strong>Live Range</strong> (4 hours past → 1 hour future)
+                    </label>
+                    <label style="cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="autoRefreshCheckbox" style="cursor: pointer; margin-right: 5px;">
+                        <strong>Auto-refresh</strong> (every 1 minute)
+                    </label>
+                </div>
+                <div class="date-inputs">
+                    <div class="date-input-group">
+                        <label>Start Date & Time</label>
+                        <input type="datetime-local" id="startDateTime">
+                    </div>
+                    <div class="date-input-group">
+                        <label>End Date & Time</label>
+                        <input type="datetime-local" id="endDateTime">
+                    </div>
+                    <button id="loadRange">Load Data</button>
+                    
+                    <button id="lastDay">Last 24 Hours</button>
+                    <button id="lastWeek">Last 7 Days</button>
+                    <button id="allData">All Available Data</button>
+                </div>
+            </div>
+
+            <div id="metricsContainer" style="display: none;" class="metrics-selector">
+                <h3 style="margin-bottom: 10px;">Metrics to Display:</h3>
+                <label><input type="checkbox" value="temperature_C" checked> Temperature (°C)</label>
+                <label><input type="checkbox" value="humidity" checked> Humidity (%)</label>
+                <label><input type="checkbox" value="absolute_humidity"> Absolute Humidity (g/m³)</label>
+                <label><input type="checkbox" value="rssi" id="rssiCheckbox"> RSSI (dB)</label>
+                <label><input type="checkbox" value="snr"> SNR (dB)</label>
+                <label><input type="checkbox" value="noise"> Noise (dB)</label>
+                <label><input type="checkbox" value="plugOn"> Plug On</label>
+            </div>
+        </div>
+
+        <div id="chartContainer" class="chart-container" style="display: none;">
+            <div class="chart-wrapper">
+                <canvas id="chart"></canvas>
+            </div>
+        </div>
+
+        <div id="error" style="display: none;" class="error"></div>
+    </div>
+
+    <!-- Label IDs Modal -->
+    <div id="labelModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Label IDs</h2>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body" id="labelModalBody">
+                <!-- Will be populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button id="saveLabels">Save</button>
+                <button id="cancelLabels">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let logsDirectoryHandle = null;
+        let currentData = [];
+        let availableFiles = [];
+        let selectedStartDate = null;
+        let selectedEndDate = null;
+        let chartInstance = null;
+        let hiddenDatasets = new Set(); // Track hidden dataset labels
+        let autoRefreshInterval = null; // Track auto-refresh interval
+        let idLabels = {}; // Store labels for IDs
+
+        const colors = [
+            '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7',
+            '#fd79a8', '#fdcb6e', '#e17055', '#74b9ff', '#a29bfe',
+            '#55efc4', '#ffeaa7', '#fab1a0', '#ff7675', '#00b894'
+        ];
+
+        // Calculate absolute humidity from temperature (°C) and relative humidity (%)
+        function calculateAbsoluteHumidity(tempC, relativeHumidity) {
+            if (tempC === undefined || relativeHumidity === undefined) return undefined;
+            
+            // Using the Magnus-Tetens approximation
+            // AH = (RH/100) × (6.112 × e^((17.67 × T)/(T + 243.5)) × 2.1674) / (273.15 + T)
+            const saturationVaporPressure = 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5));
+            const actualVaporPressure = (relativeHumidity / 100) * saturationVaporPressure;
+            const absoluteHumidity = (actualVaporPressure * 2.1674) / (273.15 + tempC);
+            
+            return absoluteHumidity;
+        }
+
+        // Label management functions
+        function loadLabels() {
+            const saved = localStorage.getItem('radioIdLabels');
+            if (saved) {
+                try {
+                    idLabels = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Failed to parse saved labels:', e);
+                    idLabels = {};
+                }
+            }
+        }
+
+        function saveLabels() {
+            localStorage.setItem('radioIdLabels', JSON.stringify(idLabels));
+        }
+
+        function getDisplayName(id) {
+            if (idLabels[id] && idLabels[id].trim()) {
+                return `${idLabels[id]} (${id})`;
+            }
+            return id;
+        }
+
+        function getAllUniqueIds() {
+            const ids = new Set();
+            currentData.forEach(entry => {
+                if (entry.id) {
+                    ids.add(entry.id);
+                }
+            });
+            return Array.from(ids).sort();
+        }
+
+        function openLabelModal() {
+            const uniqueIds = getAllUniqueIds();
+            const modalBody = document.getElementById('labelModalBody');
+            
+            // Clear existing content
+            modalBody.innerHTML = '';
+            
+            if (uniqueIds.length === 0) {
+                modalBody.innerHTML = '<p style="color: #888;">No IDs found in current data. Please load data first.</p>';
+            } else {
+                uniqueIds.forEach(id => {
+                    const group = document.createElement('div');
+                    group.className = 'label-input-group';
+                    
+                    const label = document.createElement('label');
+                    label.textContent = `ID: ${id}`;
+                    
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = idLabels[id] || '';
+                    input.placeholder = 'Enter label (optional)';
+                    input.dataset.id = id;
+                    
+                    group.appendChild(label);
+                    group.appendChild(input);
+                    modalBody.appendChild(group);
+                });
+            }
+            
+            document.getElementById('labelModal').style.display = 'flex';
+        }
+
+        function closeLabelModal() {
+            document.getElementById('labelModal').style.display = 'none';
+        }
+
+        function saveLabelChanges() {
+            const inputs = document.querySelectorAll('#labelModalBody input[data-id]');
+            inputs.forEach(input => {
+                const id = input.dataset.id;
+                const value = input.value.trim();
+                if (value) {
+                    idLabels[id] = value;
+                } else {
+                    delete idLabels[id];
+                }
+            });
+            saveLabels();
+            closeLabelModal();
+            
+            // Redraw chart if data is loaded
+            if (currentData.length > 0) {
+                drawChart();
+            }
+        }
+
+        // IndexedDB for persisting directory handle
+        const DB_NAME = 'RadioLogsDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'settings';
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
+                    }
+                };
+            });
+        }
+
+        async function saveDirectoryHandle(handle) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put(handle, 'logsDirectory');
+                
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function loadDirectoryHandle() {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get('logsDirectory');
+                
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function requestPersistentPermission() {
+            if (navigator.storage && navigator.storage.persist) {
+                const isPersisted = await navigator.storage.persist();
+                console.log(`Persistent storage: ${isPersisted ? 'granted' : 'denied'}`);
+                return isPersisted;
+            }
+            return false;
+        }
+
+        async function verifyPermission(handle, readWrite = false) {
+            const options = { mode: readWrite ? 'readwrite' : 'read' };
+            
+            // Check if permission was already granted
+            if ((await handle.queryPermission(options)) === 'granted') {
+                return true;
+            }
+            
+            // Request permission
+            if ((await handle.requestPermission(options)) === 'granted') {
+                return true;
+            }
+            
+            return false;
+        }
+
+        async function initializeWithSavedHandle() {
+            try {
+                const savedHandle = await loadDirectoryHandle();
+                if (savedHandle) {
+                    // Verify we still have permission
+                    if (await verifyPermission(savedHandle, false)) {
+                        logsDirectoryHandle = savedHandle;
+                        await loadAvailableFiles();
+                        document.getElementById('folderInfo').textContent = `✓ Loaded: ${logsDirectoryHandle.name}`;
+                        document.getElementById('dateRangeContainer').style.display = 'block';
+                        document.getElementById('selectFolder').textContent = 'Change Logs Folder';
+                    } else {
+                        // Permission denied, clear saved handle
+                        document.getElementById('folderInfo').textContent = 'Previous folder access expired. Please select again.';
+                    }
+                }
+            } catch (err) {
+                console.log('No saved directory handle or error loading:', err);
+            }
+        }
+
+        // Select folder button
+        document.getElementById('selectFolder').addEventListener('click', async () => {
+            try {
+                logsDirectoryHandle = await window.showDirectoryPicker();
+                
+                // Request persistent storage
+                await requestPersistentPermission();
+                
+                // Save handle to IndexedDB
+                await saveDirectoryHandle(logsDirectoryHandle);
+                
+                await loadAvailableFiles();
+                document.getElementById('folderInfo').textContent = `✓ Loaded: ${logsDirectoryHandle.name}`;
+                document.getElementById('dateRangeContainer').style.display = 'block';
+                document.getElementById('error').style.display = 'none';
+                document.getElementById('selectFolder').textContent = 'Change Logs Folder';
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    showError('Failed to access folder: ' + err.message);
+                }
+            }
+        });
+
+        function updateURL() {
+            const params = new URLSearchParams();
+            
+            if (selectedStartDate) {
+                params.set('start', selectedStartDate.toString());
+            }
+            
+            if (selectedEndDate) {
+                params.set('end', selectedEndDate.toString());
+            }
+            
+            const selectedMetrics = getSelectedMetrics();
+            if (selectedMetrics.length > 0) {
+                params.set('metrics', selectedMetrics.join(','));
+            }
+            
+            // Save hidden datasets
+            if (hiddenDatasets.size > 0) {
+                params.set('hidden', Array.from(hiddenDatasets).join('|||'));
+            }
+            
+            // Save live range checkbox state
+            const liveRangeCheckbox = document.getElementById('liveRangeCheckbox');
+            if (liveRangeCheckbox && liveRangeCheckbox.checked) {
+                params.set('liveRange', 'true');
+            }
+            
+            // Save auto-refresh checkbox state
+            const autoRefreshCheckbox = document.getElementById('autoRefreshCheckbox');
+            if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
+                params.set('autoRefresh', 'true');
+            }
+            
+            const newURL = `${window.location.pathname}?${params.toString()}`;
+            window.history.replaceState({}, '', newURL);
+        }
+
+        function restoreFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            
+            // Restore metrics
+            const metricsParam = params.get('metrics');
+            if (metricsParam) {
+                const metrics = metricsParam.split(',');
+                document.querySelectorAll('.metrics-selector input[type="checkbox"]').forEach(cb => {
+                    cb.checked = metrics.includes(cb.value);
+                });
+            }
+            
+            // Restore hidden datasets
+            const hiddenParam = params.get('hidden');
+            const hiddenDatasets = hiddenParam ? hiddenParam.split('|||') : [];
+            
+            // Restore live range checkbox
+            const liveRange = params.get('liveRange') === 'true';
+            
+            // Restore auto-refresh checkbox
+            const autoRefresh = params.get('autoRefresh') === 'true';
+            
+            // Restore date range (stored as timestamps)
+            return {
+                start: params.get('start') ? parseInt(params.get('start'), 10) : null,
+                end: params.get('end') ? parseInt(params.get('end'), 10) : null,
+                hidden: hiddenDatasets,
+                liveRange: liveRange,
+                autoRefresh: autoRefresh
+            };
+        }
+
+        function setLiveRange() {
+            const now = Date.now();
+            const start = now - 4 * 60 * 60 * 1000; // 4 hours ago
+            const end = now + 1 * 60 * 60 * 1000; // 1 hour future
+            
+            document.getElementById('startDateTime').value = formatDateTimeLocal(start);
+            document.getElementById('endDateTime').value = formatDateTimeLocal(end);
+            
+            return { start, end };
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            // Load saved labels
+            loadLabels();
+            
+            const savedRange = restoreFromURL();
+            
+            // Restore hidden datasets
+            if (savedRange.hidden && savedRange.hidden.length > 0) {
+                hiddenDatasets = new Set(savedRange.hidden);
+            }
+            
+            await initializeWithSavedHandle();
+            
+            // Restore and handle live range checkbox
+            const liveRangeCheckbox = document.getElementById('liveRangeCheckbox');
+            if (savedRange.liveRange) {
+                liveRangeCheckbox.checked = true;
+            }
+            
+            // Restore auto-refresh checkbox
+            const autoRefreshCheckbox = document.getElementById('autoRefreshCheckbox');
+            if (savedRange.autoRefresh) {
+                autoRefreshCheckbox.checked = true;
+            }
+            
+            // If live range is enabled, use it; otherwise use saved range
+            if (savedRange.liveRange && logsDirectoryHandle) {
+                const { start, end } = setLiveRange();
+                await loadDateRange(start, end);
+            } else if (savedRange.start && savedRange.end && logsDirectoryHandle) {
+                document.getElementById('startDateTime').value = formatDateTimeLocal(savedRange.start);
+                document.getElementById('endDateTime').value = formatDateTimeLocal(savedRange.end);
+                await loadDateRange(savedRange.start, savedRange.end);
+            }
+            
+            // Start auto-refresh if enabled
+            if (savedRange.autoRefresh && logsDirectoryHandle) {
+                startAutoRefresh();
+            }
+        });
+
+        function formatDateTimeLocal(timestamp) {
+            const date = new Date(timestamp);
+            const pad = (n) => n.toString().padStart(2, '0');
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        }
+
+        async function loadAvailableFiles() {
+            availableFiles = [];
+
+            for await (const entry of logsDirectoryHandle.values()) {
+                if (entry.kind === 'file' && entry.name.match(/^\d{4}-\d{2}-\d{2}-/)) {
+                    const match = entry.name.match(/^(\d{4}-\d{2}-\d{2})-/);
+                    if (match) {
+                        // Store as start/end timestamps for the day
+                        const dateStr = match[1];
+                        const startOfDay = new Date(dateStr + 'T00:00:00').getTime();
+                        const endOfDay = new Date(dateStr + 'T23:59:59.999').getTime();
+                        availableFiles.push({ 
+                            startOfDay: startOfDay,
+                            endOfDay: endOfDay,
+                            handle: entry 
+                        });
+                    }
+                }
+            }
+
+            availableFiles.sort((a, b) => b.startOfDay - a.startOfDay); // Sort newest first
+
+            // Set default date range to the most recent day if available
+            if (availableFiles.length > 0) {
+                const now = Date.now();
+                document.getElementById('endDateTime').value = formatDateTimeLocal(now);
+                
+                const yesterday = now - 24 * 60 * 60 * 1000;
+                document.getElementById('startDateTime').value = formatDateTimeLocal(yesterday);
+            }
+        }
+
+        async function loadDateRange(startTime, endTime) {
+            try {
+                selectedStartDate = startTime;
+                selectedEndDate = endTime;
+                
+                // Find all files that might contain data in this range
+                // File objects have startOfDay and endOfDay timestamps
+                const filesToLoad = availableFiles.filter(file => {
+                    // Include file if it overlaps with our time range at all
+                    return file.endOfDay >= startTime && file.startOfDay <= endTime;
+                });
+
+                if (filesToLoad.length === 0) {
+                    showError('No log files found for the selected date range');
+                    return;
+                }
+
+                currentData = [];
+                
+                // Load all files in the range
+                for (const fileInfo of filesToLoad) {
+                    const file = await fileInfo.handle.getFile();
+                    const text = await file.text();
+                    const lines = text.trim().split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.trim()) {
+                            try {
+                                const json = JSON.parse(line);
+                                const entryTime = new Date(json.time).getTime();
+                                
+                                // Only include entries within the time range
+                                if (entryTime >= startTime && entryTime <= endTime) {
+                                    // Calculate absolute humidity if temperature and humidity are present
+                                    if (json.temperature_C !== undefined && json.humidity !== undefined) {
+                                        json.absolute_humidity = calculateAbsoluteHumidity(json.temperature_C, json.humidity);
+                                    }
+                                    
+                                    // Store time as timestamp (number) instead of string
+                                    json.time = entryTime;
+                                    currentData.push(json);
+                                }
+                            } catch (e) {
+                                // Skip invalid JSON lines
+                            }
+                        }
+                    }
+                }
+
+                // Sort by time (now numeric timestamps)
+                currentData.sort((a, b) => a.time - b.time);
+
+                document.getElementById('metricsContainer').style.display = 'block';
+                document.getElementById('chartContainer').style.display = 'block';
+                document.getElementById('labelIds').style.display = 'inline-block';
+                document.getElementById('error').style.display = 'none';
+                updateURL();
+                drawChart();
+            } catch (err) {
+                showError('Failed to load log files: ' + err.message);
+            }
+        }
+
+        // Load Range button
+        document.getElementById('loadRange').addEventListener('click', async () => {
+            const startInput = document.getElementById('startDateTime').value;
+            const endInput = document.getElementById('endDateTime').value;
+            
+            if (!startInput || !endInput) {
+                showError('Please select both start and end date/time');
+                return;
+            }
+            
+            const startTime = new Date(startInput).getTime();
+            const endTime = new Date(endInput).getTime();
+            
+            if (startTime >= endTime) {
+                showError('Start date must be before end date');
+                return;
+            }
+            
+            await loadDateRange(startTime, endTime);
+        });
+
+        // Last 24 hours button
+        document.getElementById('lastDay').addEventListener('click', async () => {
+            const end = Date.now();
+            const start = end - 24 * 60 * 60 * 1000;
+            
+            document.getElementById('startDateTime').value = formatDateTimeLocal(start);
+            document.getElementById('endDateTime').value = formatDateTimeLocal(end);
+            
+            await loadDateRange(start, end);
+        });
+
+        // Last 7 days button
+        document.getElementById('lastWeek').addEventListener('click', async () => {
+            const end = Date.now();
+            const start = end - 7 * 24 * 60 * 60 * 1000;
+            
+            document.getElementById('startDateTime').value = formatDateTimeLocal(start);
+            document.getElementById('endDateTime').value = formatDateTimeLocal(end);
+            
+            await loadDateRange(start, end);
+        });
+
+        // All data button
+        document.getElementById('allData').addEventListener('click', async () => {
+            if (availableFiles.length === 0) {
+                showError('No log files available');
+                return;
+            }
+            
+            const start = availableFiles[availableFiles.length - 1].startOfDay;
+            const end = Date.now();
+            
+            document.getElementById('startDateTime').value = formatDateTimeLocal(start);
+            document.getElementById('endDateTime').value = formatDateTimeLocal(end);
+            
+            await loadDateRange(start, end);
+        });
+
+        // Listen to metric checkbox changes
+        document.querySelectorAll('.metrics-selector input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                updateURL();
+                if (currentData.length > 0) {
+                    drawChart();
+                }
+            });
+        });
+
+        // Listen to live range checkbox changes
+        document.getElementById('liveRangeCheckbox').addEventListener('change', async (e) => {
+            if (e.target.checked) {
+                // Set to live range
+                const { start, end } = setLiveRange();
+                updateURL();
+                if (logsDirectoryHandle) {
+                    await loadDateRange(start, end);
+                }
+            } else {
+                // Unchecked - just update URL to remove the parameter
+                updateURL();
+            }
+        });
+
+        // Listen to auto-refresh checkbox changes
+        document.getElementById('autoRefreshCheckbox').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+            updateURL();
+        });
+
+        // Label IDs button
+        document.getElementById('labelIds').addEventListener('click', openLabelModal);
+
+        // Modal controls
+        document.getElementById('closeModal').addEventListener('click', closeLabelModal);
+        document.getElementById('cancelLabels').addEventListener('click', closeLabelModal);
+        document.getElementById('saveLabels').addEventListener('click', saveLabelChanges);
+
+        // Close modal when clicking outside
+        document.getElementById('labelModal').addEventListener('click', (e) => {
+            if (e.target.id === 'labelModal') {
+                closeLabelModal();
+            }
+        });
+
+        function startAutoRefresh() {
+            // Clear any existing interval
+            stopAutoRefresh();
+            
+            // Set up new interval (60000ms = 1 minute)
+            autoRefreshInterval = setInterval(async () => {
+                if (logsDirectoryHandle && selectedStartDate && selectedEndDate) {
+                    // If live range is enabled, update the range first
+                    const liveRangeCheckbox = document.getElementById('liveRangeCheckbox');
+                    if (liveRangeCheckbox && liveRangeCheckbox.checked) {
+                        const { start, end } = setLiveRange();
+                        await loadDateRange(start, end);
+                    } else {
+                        // Otherwise just reload the current range
+                        await loadDateRange(selectedStartDate, selectedEndDate);
+                    }
+                }
+            }, 60000); // 1 minute
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+
+        function getSelectedMetrics() {
+            const metrics = [];
+            document.querySelectorAll('.metrics-selector input[type="checkbox"]:checked').forEach(cb => {
+                metrics.push(cb.value);
+            });
+            return metrics;
+        }
+
+        function getMetricLabel(metric) {
+            const labels = {
+                'temperature_C': 'Temperature (°C)',
+                'humidity': 'Humidity (%)',
+                'absolute_humidity': 'Absolute Humidity (g/m³)',
+                'rssi': 'RSSI (dB)',
+                'snr': 'SNR (dB)',
+                'noise': 'Noise (dB)',
+                'plugOn': 'Plug On'
+            };
+            return labels[metric] || metric;
+        }
+
+        function drawChart() {
+            const selectedMetrics = getSelectedMetrics();
+            
+            if (currentData.length === 0) {
+                return;
+            }
+
+            if (selectedMetrics.length === 0) {
+                return;
+            }
+
+            // Destroy existing chart
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            // Define line styles for different metrics
+            const metricBorderDash = {
+                'temperature_C': [],  // Solid line
+                'humidity': [5, 5],   // Dashed
+                'absolute_humidity': [8, 3, 2, 3], // Dash-dot
+                'rssi': [2, 3],       // Short dash
+                'snr': [10, 3, 2, 3], // Dash-dot
+                'noise': [1, 3],      // Dotted
+                'plugOn': [15, 3]     // Long dash
+            };
+
+            // Group data by ID and metric
+            const dataByIdAndMetric = {};
+            
+            currentData.forEach(entry => {
+                const id = entry.id || 'unknown';
+                
+                if (!dataByIdAndMetric[id]) {
+                    dataByIdAndMetric[id] = {};
+                }
+
+                selectedMetrics.forEach(metric => {
+                    if (entry[metric] !== undefined) {
+                        if (!dataByIdAndMetric[id][metric]) {
+                            dataByIdAndMetric[id][metric] = [];
+                        }
+                        // Convert boolean to number (true -> 1, false -> 0)
+                        let value = entry[metric];
+                        if (typeof value === 'boolean') {
+                            value = value ? 1 : 0;
+                        } else {
+                            value = parseFloat(value);
+                        }
+                        dataByIdAndMetric[id][metric].push({
+                            x: new Date(entry.time),
+                            y: value
+                        });
+                    }
+                });
+            });
+
+            // Detect gaps and insert nulls to break lines
+            Object.keys(dataByIdAndMetric).forEach(id => {
+                Object.keys(dataByIdAndMetric[id]).forEach(metric => {
+                    const points = dataByIdAndMetric[id][metric];
+                    
+                    if (points.length < 2) return;
+                    
+                    // Sort by time
+                    points.sort((a, b) => a.x - b.x);
+                    
+                    // Calculate typical gap between data points
+                    const gaps = [];
+                    for (let i = 1; i < points.length; i++) {
+                        gaps.push(points[i].x - points[i - 1].x);
+                    }
+                    
+                    // Use median gap as the typical interval
+                    gaps.sort((a, b) => a - b);
+                    const medianGap = gaps[Math.floor(gaps.length / 2)];
+                    const gapThreshold = medianGap * 10; // 10x the typical gap
+                    
+                    // Insert null values where gaps are too large
+                    const processedPoints = [];
+                    for (let i = 0; i < points.length; i++) {
+                        processedPoints.push(points[i]);
+                        
+                        if (i < points.length - 1) {
+                            const gap = points[i + 1].x - points[i].x;
+                            if (gap > gapThreshold) {
+                                // Insert a null to break the line
+                                processedPoints.push({
+                                    x: new Date(points[i].x.getTime() + 1),
+                                    y: null
+                                });
+                            }
+                        }
+                    }
+                    
+                    dataByIdAndMetric[id][metric] = processedPoints;
+                });
+            });
+
+            // Assign colors to each unique ID
+            let colorIndex = 0;
+            const idColorMap = {};
+            Object.keys(dataByIdAndMetric).forEach(id => {
+                idColorMap[id] = colors[colorIndex % colors.length];
+                colorIndex++;
+            });
+
+            // Find the actual time range of the data
+            let minTime = null;
+            let maxTime = null;
+            Object.values(dataByIdAndMetric).forEach(metricsData => {
+                Object.values(metricsData).forEach(points => {
+                    points.forEach(point => {
+                        if (!minTime || point.x < minTime) minTime = point.x;
+                        if (!maxTime || point.x > maxTime) maxTime = point.x;
+                    });
+                });
+            });
+
+            // Create datasets for Chart.js
+            const datasets = [];
+            const yAxes = {};
+            const metricToAxisMap = {};
+            let yAxisIndex = 0;
+
+            // First pass: Create Y axes for each unique metric
+            selectedMetrics.forEach(metric => {
+                const yAxisID = `y${yAxisIndex}`;
+                metricToAxisMap[metric] = yAxisID;
+                
+                yAxes[yAxisID] = {
+                    type: 'linear',
+                    display: true,
+                    position: yAxisIndex % 2 === 0 ? 'left' : 'right',
+                    title: {
+                        display: true,
+                        text: getMetricLabel(metric),
+                        color: '#888'
+                    },
+                    ticks: {
+                        color: '#888'
+                    },
+                    grid: {
+                        drawOnChartArea: yAxisIndex === 0
+                    }
+                };
+                
+                yAxisIndex++;
+            });
+
+            // Second pass: Create datasets, assigning them to the appropriate Y axis
+            Object.entries(dataByIdAndMetric).forEach(([id, metricsData]) => {
+                const idColor = idColorMap[id];
+                
+                selectedMetrics.forEach(metric => {
+                    if (metricsData[metric] && metricsData[metric].length > 0) {
+                        const yAxisID = metricToAxisMap[metric];
+                        
+                        // Create dataset
+                        const label = `${getDisplayName(id)} - ${getMetricLabel(metric)}`;
+                        const isEventData = metric === 'plugOn'; // Binary event data
+                        
+                        datasets.push({
+                            label: label,
+                            id: id, // Store ID for visibility tracking
+                            data: metricsData[metric],
+                            borderColor: idColor,
+                            backgroundColor: idColor,
+                            borderWidth: isEventData ? 0 : 2,
+                            pointRadius: isEventData ? 6 : 0,
+                            pointHoverRadius: isEventData ? 8 : 4,
+                            pointStyle: isEventData ? 'circle' : 'circle',
+                            tension: 0,
+                            stepped: isEventData ? false : 'before',
+                            spanGaps: false,
+                            showLine: !isEventData,
+                            borderDash: metricBorderDash[metric] || [],
+                            yAxisID: yAxisID,
+                            hidden: hiddenDatasets.has(id),
+                            segment: {
+                                borderColor: ctx => {
+                                    // Don't draw line segments that go beyond actual data
+                                    return idColor;
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+
+            // Create the chart
+            const ctx = document.getElementById('chart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: datasets
+                },
+                options: {
+                    animation: false,
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `Data from ${new Date(selectedStartDate).toLocaleString()} to ${new Date(selectedEndDate).toLocaleString()}`,
+                            color: '#fff',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                                color: '#e0e0e0',
+                                usePointStyle: true,
+                                padding: 15
+                            },
+                            onClick: (e, legendItem, legend) => {
+                                const index = legendItem.datasetIndex;
+                                const chart = legend.chart;
+                                const clickedDataset = chart.data.datasets[index];
+                                const clickedId = clickedDataset.id;
+                                
+                                // Determine if we're hiding or showing based on current state
+                                const currentMeta = chart.getDatasetMeta(index);
+                                const shouldHide = currentMeta.hidden === null ? !clickedDataset.hidden : null;
+                                
+                                // Toggle visibility for ALL datasets with this ID
+                                chart.data.datasets.forEach((dataset, i) => {
+                                    if (dataset.id === clickedId) {
+                                        const meta = chart.getDatasetMeta(i);
+                                        meta.hidden = shouldHide;
+                                    }
+                                });
+                                
+                                // Update hidden datasets set
+                                if (shouldHide) {
+                                    hiddenDatasets.add(clickedId);
+                                } else {
+                                    hiddenDatasets.delete(clickedId);
+                                }
+                                
+                                chart.update();
+                                updateURL();
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(42, 42, 42, 0.9)',
+                            titleColor: '#fff',
+                            bodyColor: '#e0e0e0',
+                            borderColor: '#444',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                displayFormats: {
+                                    hour: 'HH:mm',
+                                    minute: 'HH:mm'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Time',
+                                color: '#888'
+                            },
+                            ticks: {
+                                color: '#888'
+                            },
+                            grid: {
+                                color: '#333'
+                            }
+                        },
+                        ...yAxes
+                    }
+                }
+            });
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Handle window resize
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (currentData.length > 0) {
+                    drawChart();
+                }
+            }, 250);
+        });
+    </script>
+</body>
+</html>
+
