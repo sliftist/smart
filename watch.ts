@@ -4,7 +4,7 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 
 // Configuration
-const POLL_INTERVAL_MS = 60000; // Check every 60 seconds
+const POLL_INTERVAL_MS = 30000; // Check every 60 seconds
 const RESTART_COMMAND = "bash ~/startup.sh";
 const GIT_REF = "origin/main"; // Change to your branch, e.g., "origin/master"
 
@@ -107,10 +107,6 @@ async function restartScripts(): Promise<void> {
         }
 
         console.log("[Git Auto-Update] Scripts restarted successfully");
-
-        // Exit this script after restarting (the startup script should restart this too)
-        console.log("[Git Auto-Update] Exiting auto-update script...");
-        process.exit(0);
     } catch (error) {
         console.error("[Git Auto-Update] Error restarting scripts:", error);
         console.log("[Git Auto-Update] Continuing to poll...");

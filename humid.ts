@@ -16,7 +16,7 @@ import { timeInMinute } from "socket-function/src/misc";
 const HUMIDITY_ID = "132";
 const MIN_HUMIDITY = 48;
 const MAX_HUMIDITY = 52;
-const THROTTLE_TIME = timeInMinute * 10;
+const THROTTLE_TIME = timeInMinute * 2;
 const MAX_TIME_OFF = timeInMinute * 5;
 const MAX_TIME_NO_DATA = timeInMinute * 10;
 const PLUG = PlugOne;
