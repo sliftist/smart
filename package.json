@@ -5,11 +5,12 @@
   "author": "",
   "license": "MIT",
   "scripts": {
-    "start": "start \"\" /b cmd /c \"yarn humidifer\" & start \"\" /b cmd /c \"yarn thermostat\"",
+    "start": "start \"\" /b cmd /c \"yarn humid\" & start \"\" /b cmd /c \"yarn thermostat\"",
     "thermostat": "yarn log thermostat yarn typenode ./thermostat.ts",
-    "humidifer": "yarn log humidifer yarn typenode ./humidifer.ts",
+    "humid": "yarn log humid yarn typenode ./humid.ts",
     "test": "yarn typenode ./test.ts",
-    "log": "yarn typenode ./log.ts"
+    "log": "yarn typenode ./log.ts",
+    "watch": "yarn typenode ./watch.ts"
   },
   "dependencies": {
     "mobx": "^6.15.0",
