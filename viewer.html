@@ -266,7 +266,7 @@
                     </label>
                     <label style="cursor: pointer; user-select: none;">
                         <input type="checkbox" id="autoRefreshCheckbox" style="cursor: pointer; margin-right: 5px;">
-                        <strong>Auto-refresh</strong> (every 1 minute)
+                        <strong>Auto-load data</strong>
                     </label>
                 </div>
                 <div class="date-inputs">
@@ -719,6 +719,7 @@
         }
 
         async function loadDateRange(startTime, endTime) {
+            let time = Date.now();
             try {
                 selectedStartDate = startTime;
                 selectedEndDate = endTime;
@@ -791,6 +792,7 @@
             } catch (err) {
                 showError('Failed to load log files: ' + err.message);
             }
+            console.log(`Loaded data in ${Date.now() - time}ms`);
         }
 
         // Load Range button
@@ -906,7 +908,6 @@
             // Clear any existing interval
             stopAutoRefresh();
             
-            // Set up new interval (60000ms = 1 minute)
             autoRefreshInterval = setInterval(async () => {
                 if (logsDirectoryHandle && selectedStartDate && selectedEndDate) {
                     // If live range is enabled, update the range first
@@ -919,7 +920,7 @@
                         await loadDateRange(selectedStartDate, selectedEndDate);
                     }
                 }
-            }, 60000); // 1 minute
+            }, 20000);
         }
 
         function stopAutoRefresh() {

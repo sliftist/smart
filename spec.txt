@@ -1,6 +1,10 @@
 NEED: ferrite cores
 
-- Parameterize humid, to accept min/max, plug mac address and humidity detector id
+TODO: Autorefresh breaks when we restart the pi?
+    - I think if it goes down it breaks the file system api handles?
+    - Maybe it should just refresh the page, instead of reloading the data?
+
+- Parameterize humid, to accept humidity (single value), plug mac address and humidity detector id
 - Run two, in different rooms?
 
 Better chart display of points

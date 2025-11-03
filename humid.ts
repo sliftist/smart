@@ -14,10 +14,10 @@ import { timeInMinute } from "socket-function/src/misc";
 */
 
 const HUMIDITY_ID = "132";
-const MIN_HUMIDITY = 55;
+const MIN_HUMIDITY = 60;
 const MAX_HUMIDITY = 60;
 const THROTTLE_TIME = timeInMinute * 2;
-const MAX_TIME_OFF = timeInMinute * 5;
+const MAX_DATA_AGE = timeInMinute * 5;
 const MAX_TIME_NO_DATA = timeInMinute * 10;
 const PLUG = PlugOne;
 
@@ -71,7 +71,7 @@ async function main() {
         let humidity = allData[HUMIDITY_ID];
         if (humidity && "humidity" in humidity) {
             let timeOff = Math.abs(new Date(humidity.time).getTime() - Date.now());
-            if (timeOff > MAX_TIME_OFF) {
+            if (timeOff > MAX_DATA_AGE) {
                 console.warn(`Humidity data is too old for ${HUMIDITY_ID}. Now is ${formatNiceDateTime(Date.now())}, and the humidity was at ${formatNiceDateTime(+new Date(humidity.time))}, so it is ${formatTime(timeOff)} off`);
                 return undefined;
             }
