@@ -16,3 +16,17 @@ Have chart show all values in a line, instead of just the closest x value.
     - sudo apt install librtlsdr0
 
 1) Floor plan with visualized metrics (not over time, but we can seek times to see them change)
+
+TODO: Variable rate humidifier
+    - THEN, if it is 1 tick above the target, reduce the rate by 10%, then at 2 ticks reduce by 20%, etc.
+            - OH! And at 2 ticks above, reduce by more slightly, as time goes on, as we don't just want to stop it, we want to reduce it.
+        - I believe it might oscilate, BUT, will eventually reach the perfect rate
+        - We should chart this and look at some of the math. I am sure there is a perfect adjustment.
+        - ALSO, cheating, but looking at more sensors, can help as well. But then again... a tick based approach will work for steady state conditions.
+    - OH! So what we actually want to do, is essentially calculate the velocity.
+        - It's a little bit weird because the values are not very granular, so you know we might get one tick after five minutes. 
+        - But once we do that, then we can see, you know, if if if one tick happened in five minutes, then the velocity is one tick per five minutes. And if the current percentage is 50%... Then we essentially create a conversion between percentage and raw velocity, And use this to compute the Velocity: We should change it to to create a parity between the raw velocity and the drain rate. 
+    - There is also the lag, as in we turn it off, but the humidity keeps going up because the humidity sensor has a lag.
+        - This might have a slight negative acceleration as well, but I think we can probably just represent it as a single number. 
+        - Calculating the leg is a lot harder, but I think over time, when we turn it off, we can kind of see how much leg there is. I guess basically, if the value goes up after a certain amount of time, we average that time, and that's the lag. If it never goes up, that helps reduce the lag average. If it sometimes takes three minutes, then, you know, that's going to increase the lag average. If sometimes it goes up by two, then the average is even higher. 
+            - I think we might also have to take into account when it starts going back down?

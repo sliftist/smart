@@ -10,7 +10,8 @@
     "humid": "yarn log humid yarn typenode ./humid.ts",
     "test": "yarn typenode ./test.ts",
     "log": "yarn typenode ./log.ts",
-    "watch": "yarn typenode ./watch.ts"
+    "watch": "yarn typenode ./watch.ts",
+    "sleep": "yarn typenode ./sleep.ts"
   },
   "dependencies": {
     "mobx": "^6.15.0",

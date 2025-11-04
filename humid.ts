@@ -14,8 +14,7 @@ import { timeInMinute } from "socket-function/src/misc";
 */
 
 const HUMIDITY_ID = "132";
-const MIN_HUMIDITY = 60;
-const MAX_HUMIDITY = 60;
+const HUMIDITY = 60;
 const THROTTLE_TIME = timeInMinute * 2;
 const MAX_DATA_AGE = timeInMinute * 5;
 const MAX_TIME_NO_DATA = timeInMinute * 10;
@@ -113,14 +112,14 @@ async function main() {
             return;
         }
         humidityCountdown.value = 0;
-        if (humidity < MIN_HUMIDITY) {
-            console.log(`Turning on humidifier for #${HUMIDITY_ID} due to humidity being too low ${humidity} < ${MIN_HUMIDITY} at ${formatNiceDateTime(Date.now())}`);
+        if (humidity <= HUMIDITY) {
+            console.log(`Turning on humidifier for #${HUMIDITY_ID} due to humidity being too low ${humidity} < ${HUMIDITY} at ${formatNiceDateTime(Date.now())}`);
             changePlugState(true);
-        } else if (humidity > MAX_HUMIDITY) {
-            console.log(`Turning off humidifier for #${HUMIDITY_ID} due to humidity being too high ${humidity} > ${MAX_HUMIDITY} at ${formatNiceDateTime(Date.now())}`);
+        } else if (humidity > HUMIDITY) {
+            console.log(`Turning off humidifier for #${HUMIDITY_ID} due to humidity being too high ${humidity} > ${HUMIDITY} at ${formatNiceDateTime(Date.now())}`);
             changePlugState(false);
         } else {
-            console.log(`Humidity is within range ${humidity} for #${HUMIDITY_ID} (${MIN_HUMIDITY} - ${MAX_HUMIDITY}) at ${formatNiceDateTime(Date.now())}`);
+            console.log(`Humidity is equal to target ${humidity} for #${HUMIDITY_ID} (${HUMIDITY}) at ${formatNiceDateTime(Date.now())}`);
         }
     });
 
