@@ -6,6 +6,10 @@ import * as os from "os";
 // Set up in app, and then read from there, or just read off the device itself.
 const PLUG_ONE = "8C902DF801D2";
 const PLUG_TWO = "8C902DF80E35";
+const PLUG_THREE = "CCBABD05A2E2";
+const PLUG_FOUR = "CCBABD0592DE";
+const PLUG_FIVE = "CCBABD059E1E";
+const PLUG_SIX = "CCBABD059D36";
 
 const getCreds = lazy(async () => {
     let contents = await fs.promises.readFile(os.homedir() + "/tplink.json", "utf8");
@@ -42,5 +46,13 @@ export class Plug {
     }
 }
 
+// humidifier
 export const PlugOne = new Plug(PLUG_ONE);
+// monitors
 export const PlugTwo = new Plug(PLUG_TWO);
+// uv cleaner
+export const PlugThree = new Plug(PLUG_THREE);
+// uv cleaner reservoir
+export const PlugFour = new Plug(PLUG_FOUR);
+export const PlugFive = new Plug(PLUG_FIVE);
+export const PlugSix = new Plug(PLUG_SIX);

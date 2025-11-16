@@ -17,7 +17,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: #1a1a1a;
             color: #e0e0e0;
-            padding: 20px;
+            padding: 10px;
         }
 
         .container {
@@ -26,27 +26,35 @@
         }
 
         h1 {
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             color: #fff;
+            font-size: 20px;
+        }
+
+        h3 {
+            margin-bottom: 5px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
         }
 
         .controls {
             background: #2a2a2a;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
         }
 
         button {
             background: #0066cc;
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 5px 10px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 14px;
-            margin-right: 10px;
-            margin-bottom: 10px;
+            font-size: 12px;
+            margin-right: 5px;
+            margin-bottom: 5px;
         }
 
         button:hover {
@@ -59,25 +67,25 @@
         }
 
         .date-range-selector {
-            margin-top: 15px;
+            margin-top: 8px;
         }
 
         .date-inputs {
             display: flex;
-            gap: 15px;
+            gap: 8px;
             align-items: center;
             flex-wrap: wrap;
-            margin-top: 10px;
+            margin-top: 5px;
         }
 
         .date-input-group {
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 2px;
         }
 
         .date-input-group label {
-            font-size: 12px;
+            font-size: 10px;
             color: #888;
         }
 
@@ -85,9 +93,9 @@
             background: #3a3a3a;
             color: #e0e0e0;
             border: 1px solid #555;
-            padding: 8px;
+            padding: 4px 6px;
             border-radius: 4px;
-            font-size: 14px;
+            font-size: 12px;
         }
 
         input[type="datetime-local"]:focus {
@@ -97,31 +105,32 @@
 
         .quick-select-buttons {
             display: flex;
-            gap: 10px;
-            margin-top: 10px;
+            gap: 5px;
+            margin-top: 5px;
         }
 
         .metrics-selector {
-            margin-top: 15px;
+            margin-top: 8px;
         }
 
         .metrics-selector label {
             display: inline-block;
-            margin-right: 20px;
+            margin-right: 10px;
             cursor: pointer;
             user-select: none;
+            font-size: 12px;
         }
 
         .metrics-selector input[type="checkbox"] {
-            margin-right: 5px;
+            margin-right: 3px;
             cursor: pointer;
         }
 
         .chart-container {
             background: #2a2a2a;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
         }
 
         .chart-wrapper {
@@ -136,16 +145,17 @@
 
         .info {
             color: #888;
-            margin-top: 10px;
-            font-size: 14px;
+            margin-top: 5px;
+            font-size: 12px;
         }
 
         .error {
             background: #ff4444;
             color: white;
-            padding: 10px;
+            padding: 8px;
             border-radius: 4px;
-            margin-top: 10px;
+            margin-top: 8px;
+            font-size: 12px;
         }
 
         .modal {
@@ -173,7 +183,7 @@
         }
 
         .modal-header {
-            padding: 20px;
+            padding: 12px;
             border-bottom: 1px solid #444;
             display: flex;
             justify-content: space-between;
@@ -183,18 +193,18 @@
         .modal-header h2 {
             margin: 0;
             color: #fff;
-            font-size: 20px;
+            font-size: 16px;
         }
 
         .modal-close {
             background: none;
             border: none;
             color: #888;
-            font-size: 32px;
+            font-size: 24px;
             cursor: pointer;
             padding: 0;
-            width: 32px;
-            height: 32px;
+            width: 24px;
+            height: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -208,20 +218,20 @@
         }
 
         .modal-body {
-            padding: 20px;
+            padding: 12px;
             overflow-y: auto;
             flex: 1;
         }
 
         .label-input-group {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 3px;
         }
 
         .label-input-group label {
-            font-size: 12px;
+            font-size: 11px;
             color: #888;
         }
 
@@ -229,9 +239,9 @@
             background: #3a3a3a;
             color: #e0e0e0;
             border: 1px solid #555;
-            padding: 8px;
+            padding: 5px 6px;
             border-radius: 4px;
-            font-size: 14px;
+            font-size: 12px;
         }
 
         .label-input-group input:focus {
@@ -240,32 +250,32 @@
         }
 
         .modal-footer {
-            padding: 20px;
+            padding: 12px;
             border-top: 1px solid #444;
             display: flex;
             justify-content: flex-end;
-            gap: 10px;
+            gap: 5px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="controls">
-            <div style="display: flex; flex-direction: row; gap: 10px; align-items: center;">
+            <div style="display: flex; flex-direction: row; gap: 5px; align-items: center;">
                 <button id="selectFolder">Select Logs Folder</button>
                 <button id="labelIds" style="display: none;">Label IDs</button>
                 <div id="folderInfo" class="info"></div>
             </div>
             
             <div id="dateRangeContainer" style="display: none;" class="date-range-selector">
-                <h3 style="margin-bottom: 10px;">Select Date Range:</h3>
-                <div style="margin-bottom: 10px; display: flex; gap: 20px; flex-wrap: wrap;">
+                <h3>Select Date Range:</h3>
+                <div style="margin-bottom: 5px; display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px;">
                     <label style="cursor: pointer; user-select: none;">
-                        <input type="checkbox" id="liveRangeCheckbox" style="cursor: pointer; margin-right: 5px;">
+                        <input type="checkbox" id="liveRangeCheckbox" style="cursor: pointer; margin-right: 3px;">
                         <strong>Live Range</strong> (4 hours past → 1 hour future)
                     </label>
                     <label style="cursor: pointer; user-select: none;">
-                        <input type="checkbox" id="autoRefreshCheckbox" style="cursor: pointer; margin-right: 5px;">
+                        <input type="checkbox" id="autoRefreshCheckbox" style="cursor: pointer; margin-right: 3px;">
                         <strong>Auto-load data</strong>
                     </label>
                 </div>
@@ -287,7 +297,7 @@
             </div>
 
             <div id="metricsContainer" style="display: none;" class="metrics-selector">
-                <h3 style="margin-bottom: 10px;">Metrics to Display:</h3>
+                <h3>Metrics to Display:</h3>
                 <label><input type="checkbox" value="temperature_C" checked> Temperature (°C)</label>
                 <label><input type="checkbox" value="humidity" checked> Humidity (%)</label>
                 <label><input type="checkbox" value="absolute_humidity"> Absolute Humidity (g/m³)</label>
@@ -331,7 +341,7 @@
         let selectedStartDate = null;
         let selectedEndDate = null;
         let chartInstance = null;
-        let hiddenDatasets = new Set(); // Track hidden dataset labels
+        let visibleDatasets = new Set(); // Track visible dataset IDs (default all hidden)
         let autoRefreshInterval = null; // Track auto-refresh interval
         let idLabels = {}; // Store labels for IDs
 
@@ -574,9 +584,9 @@
                 params.set('metrics', selectedMetrics.join(','));
             }
             
-            // Save hidden datasets
-            if (hiddenDatasets.size > 0) {
-                params.set('hidden', Array.from(hiddenDatasets).join('|||'));
+            // Save visible datasets (only store the ones explicitly shown)
+            if (visibleDatasets.size > 0) {
+                params.set('visible', Array.from(visibleDatasets).join('|||'));
             }
             
             // Save live range checkbox state
@@ -607,9 +617,9 @@
                 });
             }
             
-            // Restore hidden datasets
-            const hiddenParam = params.get('hidden');
-            const hiddenDatasets = hiddenParam ? hiddenParam.split('|||') : [];
+            // Restore visible datasets
+            const visibleParam = params.get('visible');
+            const visibleDatasets = visibleParam ? visibleParam.split('|||') : [];
             
             // Restore live range checkbox
             const liveRange = params.get('liveRange') === 'true';
@@ -621,7 +631,7 @@
             return {
                 start: params.get('start') ? parseInt(params.get('start'), 10) : null,
                 end: params.get('end') ? parseInt(params.get('end'), 10) : null,
-                hidden: hiddenDatasets,
+                visible: visibleDatasets,
                 liveRange: liveRange,
                 autoRefresh: autoRefresh
             };
@@ -645,9 +655,9 @@
             
             const savedRange = restoreFromURL();
             
-            // Restore hidden datasets
-            if (savedRange.hidden && savedRange.hidden.length > 0) {
-                hiddenDatasets = new Set(savedRange.hidden);
+            // Restore visible datasets
+            if (savedRange.visible && savedRange.visible.length > 0) {
+                visibleDatasets = new Set(savedRange.visible);
             }
             
             await initializeWithSavedHandle();
@@ -910,6 +920,9 @@
             
             autoRefreshInterval = setInterval(async () => {
                 if (logsDirectoryHandle && selectedStartDate && selectedEndDate) {
+                    // Refresh the list of available files to pick up new log files
+                    await loadAvailableFiles();
+                    
                     // If live range is enabled, update the range first
                     const liveRangeCheckbox = document.getElementById('liveRangeCheckbox');
                     if (liveRangeCheckbox && liveRangeCheckbox.checked) {
@@ -1129,7 +1142,7 @@
                             showLine: !isEventData,
                             borderDash: metricBorderDash[metric] || [],
                             yAxisID: yAxisID,
-                            hidden: hiddenDatasets.has(id),
+                            hidden: !visibleDatasets.has(id),
                             segment: {
                                 borderColor: ctx => {
                                     // Don't draw line segments that go beyond actual data
@@ -1163,8 +1176,12 @@
                             text: `Data from ${new Date(selectedStartDate).toLocaleString()} to ${new Date(selectedEndDate).toLocaleString()}`,
                             color: '#fff',
                             font: {
-                                size: 16,
+                                size: 13,
                                 weight: 'bold'
+                            },
+                            padding: {
+                                top: 5,
+                                bottom: 5
                             }
                         },
                         legend: {
@@ -1173,7 +1190,10 @@
                             labels: {
                                 color: '#e0e0e0',
                                 usePointStyle: true,
-                                padding: 15
+                                padding: 8,
+                                font: {
+                                    size: 11
+                                }
                             },
                             onClick: (e, legendItem, legend) => {
                                 const index = legendItem.datasetIndex;
@@ -1193,11 +1213,11 @@
                                     }
                                 });
                                 
-                                // Update hidden datasets set
+                                // Update visible datasets set
                                 if (shouldHide) {
-                                    hiddenDatasets.add(clickedId);
+                                    visibleDatasets.delete(clickedId);
                                 } else {
-                                    hiddenDatasets.delete(clickedId);
+                                    visibleDatasets.add(clickedId);
                                 }
                                 
                                 chart.update();

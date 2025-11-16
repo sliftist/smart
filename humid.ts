@@ -113,7 +113,7 @@ async function main() {
         }
         humidityCountdown.value = 0;
         if (humidity <= HUMIDITY) {
-            console.log(`Turning on humidifier for #${HUMIDITY_ID} due to humidity being too low ${humidity} < ${HUMIDITY} at ${formatNiceDateTime(Date.now())}`);
+            console.log(`Turning on humidifier for #${HUMIDITY_ID} due to humidity being too low ${humidity} <= ${HUMIDITY} at ${formatNiceDateTime(Date.now())}`);
             changePlugState(true);
         } else if (humidity > HUMIDITY) {
             console.log(`Turning off humidifier for #${HUMIDITY_ID} due to humidity being too high ${humidity} > ${HUMIDITY} at ${formatNiceDateTime(Date.now())}`);

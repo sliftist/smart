@@ -1,16 +1,6 @@
 NEED: ferrite cores
 
-TODO: Autorefresh breaks when we restart the pi?
-    - I think if it goes down it breaks the file system api handles?
-    - Maybe it should just refresh the page, instead of reloading the data?
-
-- Parameterize humid, to accept humidity (single value), plug mac address and humidity detector id
-- Run two, in different rooms?
-
-Better chart display of points
-    - Add back point display, just make them smaller?
-
-Have chart show all values in a line, instead of just the closest x value.
+TODO: Web interface to manually control switches
 
 - Properly bundle the required RTL libraries for Linux. Apparently their release is missing some of the shared libraries.
     - sudo apt install librtlsdr0
@@ -30,3 +20,10 @@ TODO: Variable rate humidifier
         - This might have a slight negative acceleration as well, but I think we can probably just represent it as a single number. 
         - Calculating the leg is a lot harder, but I think over time, when we turn it off, we can kind of see how much leg there is. I guess basically, if the value goes up after a certain amount of time, we average that time, and that's the lag. If it never goes up, that helps reduce the lag average. If it sometimes takes three minutes, then, you know, that's going to increase the lag average. If sometimes it goes up by two, then the average is even higher. 
             - I think we might also have to take into account when it starts going back down?
+    - I think what we basically have is we have the velocity of the humidifier, and we also have the negative velocity of the room, which actually might even be positive velocity. We can't determine them independently, directly, but we can determine the sum of them. And then from this, eventually, we can determine to some degree the independent values, at least the independent value of the velocity of the humidifier. And then we can determine the sum, and that'll give us the velocity of the humidity of the room. And then we can start to predict how the velocity of the humidity of the room will change. For example, if the shower turns on, if the outside temperature forecast changes, etc., or just the time of the day, we can predict what the humidity of the room is, the velocity of the humidity of the room. And as our measurements are about five minutes delayed, this can allow us to react faster than that five minutes.
+        - Although even that, even when I shower, with a hot shower, it still doesn't cause net positive humidity by the humidifier. I guess if the humidity in my room was lower, it might... But if it doesn't even cause a positive humidity then we don't even really need to predict it...
+
+TODO: Turn computer on with smart switch
+    - We can have the computer turn on when the power supply is given power (in BIOS)
+    - I'm not sure if this can work with sleep? Even if not, this might still be useful.
+        - Just using the smart plug for power monitoring would be nice anyways
