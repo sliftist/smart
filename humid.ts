@@ -127,25 +127,42 @@ async function main() {
 
     // Cold at night, warm up during the day.
     {
-        // TODO: Helper to define the ranges and set the current + the dailyCallbacks
-        let hourFraction = new Date().getHours() + new Date().getMinutes() / 60;
-        if (hourFraction >= 2 && hourFraction < 9.5) {
-            await setHeatTemperatureHelper(20.5);
-        } else if (hourFraction >= 9.5 && hourFraction < 12.5) {
-            await setHeatTemperatureHelper(23.5);
-        } else {
-            await setHeatTemperatureHelper(22.5);
+        let sets = [
+            // Cold, so we go to sleep
+            { time: 2, temperature: 20.5 },
+            // Warm, to wake up
+            { time: 9.5, temperature: 23.5 },
+            // Less warm, as our computer will start to get hot around this time
+            { time: 12.5, temperature: 22.5 },
+        ];
+
+        // Helper to determine current temperature based on sets
+        function getCurrentTemperatureFromSets(sets: Array<{ time: number, temperature: number }>) {
+            let sortedSets = [...sets].sort((a, b) => a.time - b.time);
+            let hourFraction = new Date().getHours() + new Date().getMinutes() / 60;
+
+            // Find the most recent set that has passed
+            let currentTemperature = sortedSets[sortedSets.length - 1].temperature; // default to last
+            for (let i = 0; i < sortedSets.length; i++) {
+                if (hourFraction >= sortedSets[i].time) {
+                    currentTemperature = sortedSets[i].temperature;
+                } else {
+                    break;
+                }
+            }
+
+            return currentTemperature;
         }
 
-        dailyCallback(2, async () => {
-            await setHeatTemperatureHelper(20.5);
-        });
-        dailyCallback(9.5, async () => {
-            await setHeatTemperatureHelper(23.5);
-        });
-        dailyCallback(12.5, async () => {
-            await setHeatTemperatureHelper(22.5);
-        });
+        // Set initial temperature based on current time
+        await setHeatTemperatureHelper(getCurrentTemperatureFromSets(sets));
+
+        // Register daily callbacks
+        for (let set of sets) {
+            dailyCallback(set.time, async () => {
+                await setHeatTemperatureHelper(set.temperature);
+            });
+        }
     }
 }
 
