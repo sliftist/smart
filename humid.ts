@@ -137,13 +137,13 @@ async function main() {
             await setHeatTemperatureHelper(22.5);
         }
 
-        dailyCallback(2.5, async () => {
-            await setHeatTemperatureHelper(21.5);
+        dailyCallback(2, async () => {
+            await setHeatTemperatureHelper(20.5);
         });
-        dailyCallback(10.5, async () => {
+        dailyCallback(9.5, async () => {
             await setHeatTemperatureHelper(23.5);
         });
-        dailyCallback(14.5, async () => {
+        dailyCallback(12.5, async () => {
             await setHeatTemperatureHelper(22.5);
         });
     }
