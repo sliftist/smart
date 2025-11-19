@@ -129,9 +129,9 @@ async function main() {
     {
         // TODO: Helper to define the ranges and set the current + the dailyCallbacks
         let hourFraction = new Date().getHours() + new Date().getMinutes() / 60;
-        if (hourFraction >= 2.5 && hourFraction < 10.5) {
-            await setHeatTemperatureHelper(21.5);
-        } else if (hourFraction >= 10.5 && hourFraction < 14.5) {
+        if (hourFraction >= 2 && hourFraction < 9.5) {
+            await setHeatTemperatureHelper(20.5);
+        } else if (hourFraction >= 9.5 && hourFraction < 12.5) {
             await setHeatTemperatureHelper(23.5);
         } else {
             await setHeatTemperatureHelper(22.5);
