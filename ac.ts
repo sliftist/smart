@@ -34,6 +34,11 @@ const seamApiCall = retryFunctional(async function seamApiCall<T = any>(path: st
     }
 
     return await response.json();
+}, {
+    // If we crawl the API incorrectly, we will get warning messages, so that's fine. And we really, really want these calls to succeed, as if they don't, our house might stay hotter or colder than we want, which is really annoying. I don't want to wake up too cold because the internet went down for a few minutes in the night
+    maxRetries: 300,
+    minDelay: 10 * 1000,
+    maxDelay: 10 * 1000,
 });
 
 export async function getDevices() {
