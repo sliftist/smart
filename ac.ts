@@ -1,6 +1,7 @@
 import { lazy } from "socket-function/src/caching";
 import fs from "fs";
 import os from "os";
+import { retryFunctional } from "socket-function/src/batching";
 
 // IMPORTANT! While we set the values in Celsius, The underlying thermostat is in Fahrenheit integers. The user interface displays temperatures as if there's 0.5 Celsius precision, which does allow unique mapping, even though it's slightly wrong. 
 
@@ -14,7 +15,7 @@ const getSeamKey = lazy(async () => {
 
 const SEAM_API_BASE_URL = "https://connect.getseam.com";
 
-async function seamApiCall<T = any>(path: string, params: Record<string, any> = {}): Promise<T> {
+const seamApiCall = retryFunctional(async function seamApiCall<T = any>(path: string, params: Record<string, any> = {}): Promise<T> {
     const key = await getSeamKey();
     const url = `${SEAM_API_BASE_URL}${path}`;
 
@@ -33,7 +34,7 @@ async function seamApiCall<T = any>(path: string, params: Record<string, any> = 
     }
 
     return await response.json();
-}
+});
 
 export async function getDevices() {
     const result = await seamApiCall("/devices/list", {});
