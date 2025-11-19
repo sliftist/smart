@@ -263,6 +263,7 @@
         <div class="controls">
             <div style="display: flex; flex-direction: row; gap: 5px; align-items: center;">
                 <button id="selectFolder">Select Logs Folder</button>
+                <button id="enableAccess" style="display: none;">Enable Folder Access</button>
                 <button id="labelIds" style="display: none;">Label IDs</button>
                 <div id="folderInfo" class="info"></div>
             </div>
@@ -508,7 +509,7 @@
             return false;
         }
 
-        async function verifyPermission(handle, readWrite = false) {
+        async function verifyPermission(handle, readWrite = false, skipRequest = false) {
             const options = { mode: readWrite ? 'readwrite' : 'read' };
             
             // Check if permission was already granted
@@ -516,7 +517,12 @@
                 return true;
             }
             
-            // Request permission
+            // Skip request if specified (for automatic checks without user interaction)
+            if (skipRequest) {
+                return false;
+            }
+            
+            // Request permission (requires user interaction)
             if ((await handle.requestPermission(options)) === 'granted') {
                 return true;
             }
@@ -528,16 +534,20 @@
             try {
                 const savedHandle = await loadDirectoryHandle();
                 if (savedHandle) {
-                    // Verify we still have permission
-                    if (await verifyPermission(savedHandle, false)) {
-                        logsDirectoryHandle = savedHandle;
+                    // Store the handle for later use
+                    logsDirectoryHandle = savedHandle;
+                    
+                    // Verify we still have permission (skip automatic request)
+                    if (await verifyPermission(savedHandle, false, true)) {
+                        // Permission already granted
                         await loadAvailableFiles();
                         document.getElementById('folderInfo').textContent = `✓ Loaded: ${logsDirectoryHandle.name}`;
                         document.getElementById('dateRangeContainer').style.display = 'block';
                         document.getElementById('selectFolder').textContent = 'Change Logs Folder';
                     } else {
-                        // Permission denied, clear saved handle
-                        document.getElementById('folderInfo').textContent = 'Previous folder access expired. Please select again.';
+                        // Permission needs to be requested with user interaction
+                        document.getElementById('enableAccess').style.display = 'inline-block';
+                        document.getElementById('folderInfo').textContent = `Folder: ${logsDirectoryHandle.name} - Click "Enable Folder Access" to continue`;
                     }
                 }
             } catch (err) {
@@ -561,10 +571,37 @@
                 document.getElementById('dateRangeContainer').style.display = 'block';
                 document.getElementById('error').style.display = 'none';
                 document.getElementById('selectFolder').textContent = 'Change Logs Folder';
+                document.getElementById('enableAccess').style.display = 'none';
             } catch (err) {
                 if (err.name !== 'AbortError') {
                     showError('Failed to access folder: ' + err.message);
                 }
+            }
+        });
+
+        // Enable access button (for requesting permission with user interaction)
+        document.getElementById('enableAccess').addEventListener('click', async () => {
+            try {
+                if (logsDirectoryHandle) {
+                    // Request permission with user interaction
+                    if (await verifyPermission(logsDirectoryHandle, false, false)) {
+                        await loadAvailableFiles();
+                        document.getElementById('folderInfo').textContent = `✓ Loaded: ${logsDirectoryHandle.name}`;
+                        document.getElementById('dateRangeContainer').style.display = 'block';
+                        document.getElementById('error').style.display = 'none';
+                        document.getElementById('selectFolder').textContent = 'Change Logs Folder';
+                        document.getElementById('enableAccess').style.display = 'none';
+                        
+                        // If we have a saved range, load it now
+                        if (selectedStartDate && selectedEndDate) {
+                            await loadDateRange(selectedStartDate, selectedEndDate);
+                        }
+                    } else {
+                        showError('Permission to access folder was denied. Please select the folder again.');
+                    }
+                }
+            } catch (err) {
+                showError('Failed to enable folder access: ' + err.message);
             }
         });
 
@@ -660,8 +697,6 @@
                 visibleDatasets = new Set(savedRange.visible);
             }
             
-            await initializeWithSavedHandle();
-            
             // Restore and handle live range checkbox
             const liveRangeCheckbox = document.getElementById('liveRangeCheckbox');
             if (savedRange.liveRange) {
@@ -674,19 +709,31 @@
                 autoRefreshCheckbox.checked = true;
             }
             
-            // If live range is enabled, use it; otherwise use saved range
-            if (savedRange.liveRange && logsDirectoryHandle) {
+            // Store the date range for later use
+            if (savedRange.liveRange) {
                 const { start, end } = setLiveRange();
-                await loadDateRange(start, end);
-            } else if (savedRange.start && savedRange.end && logsDirectoryHandle) {
+                selectedStartDate = start;
+                selectedEndDate = end;
+            } else if (savedRange.start && savedRange.end) {
+                selectedStartDate = savedRange.start;
+                selectedEndDate = savedRange.end;
                 document.getElementById('startDateTime').value = formatDateTimeLocal(savedRange.start);
                 document.getElementById('endDateTime').value = formatDateTimeLocal(savedRange.end);
-                await loadDateRange(savedRange.start, savedRange.end);
             }
             
-            // Start auto-refresh if enabled
-            if (savedRange.autoRefresh && logsDirectoryHandle) {
-                startAutoRefresh();
+            // Try to initialize with saved handle
+            await initializeWithSavedHandle();
+            
+            // If we have a handle and permissions, load data and start auto-refresh
+            if (logsDirectoryHandle && document.getElementById('dateRangeContainer').style.display === 'block') {
+                if (selectedStartDate && selectedEndDate) {
+                    await loadDateRange(selectedStartDate, selectedEndDate);
+                }
+                
+                // Start auto-refresh if enabled
+                if (savedRange.autoRefresh) {
+                    startAutoRefresh();
+                }
             }
         });
 

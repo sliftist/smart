@@ -3,6 +3,8 @@ import { formatNiceDateTime, formatTime, formatVeryNiceDateTime } from "socket-f
 import { linesToObjects, objectsToObservable, watchDirectory, watchFile } from "./logWatcher";
 import { PlugOne } from "./plug";
 import { timeInMinute } from "socket-function/src/misc";
+import { setHeatTemperatureHelper } from "./ac";
+import { dailyCallback } from "./scheduler";
 
 /*
 24 outside
@@ -123,8 +125,28 @@ async function main() {
         }
     });
 
-    // TODO: If we can't get humidity for 10 minutes, turn off the plug, as too dry is better than too wet.
-    //  - This is simple, We just add a humidity countdown observable. Every time we get the humidity, we reset it to zero, and we have a interval which increases it by a minute every minute. And then we watch it inside the autorun, and if it's over ten minutes, then we know it's to turn off the plug. 
+    // Cold at night, warm up during the day.
+    {
+        // TODO: Helper to define the ranges and set the current + the dailyCallbacks
+        let hourFraction = new Date().getHours() + new Date().getMinutes() / 60;
+        if (hourFraction >= 2.5 && hourFraction < 10.5) {
+            await setHeatTemperatureHelper(21.5);
+        } else if (hourFraction >= 10.5 && hourFraction < 14.5) {
+            await setHeatTemperatureHelper(23.5);
+        } else {
+            await setHeatTemperatureHelper(22.5);
+        }
+
+        dailyCallback(2.5, async () => {
+            await setHeatTemperatureHelper(21.5);
+        });
+        dailyCallback(10.5, async () => {
+            await setHeatTemperatureHelper(23.5);
+        });
+        dailyCallback(14.5, async () => {
+            await setHeatTemperatureHelper(22.5);
+        });
+    }
 }
 
 main().catch(console.error);
