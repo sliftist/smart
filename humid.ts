@@ -136,22 +136,39 @@ async function main() {
             { time: 12.5, temperature: 21.5 },
         ];
 
+        // Convert sets to ranges with wrap-around support
+        function setsToRanges(sets: Array<{ time: number, temperature: number }>) {
+            let sortedSets = [...sets].sort((a, b) => a.time - b.time);
+            let ranges: Array<{ start: number, end: number, temperature: number }> = [];
+
+            for (let i = 0; i < sortedSets.length - 1; i++) {
+                let start = sortedSets[i].time;
+                let end = sortedSets[i + 1].time;
+                let temperature = sortedSets[i].temperature;
+                ranges.push({ start, end, temperature });
+            }
+
+            let last = sortedSets[sortedSets.length - 1];
+            ranges.push({ start: last.time, end: last.time + 24, temperature: last.temperature });
+            ranges.push({ start: 0, end: last.time, temperature: last.temperature });
+
+            return ranges;
+        }
+
         // Helper to determine current temperature based on sets
         function getCurrentTemperatureFromSets(sets: Array<{ time: number, temperature: number }>) {
-            let sortedSets = [...sets].sort((a, b) => a.time - b.time);
+            let ranges = setsToRanges(sets);
             let hourFraction = new Date().getHours() + new Date().getMinutes() / 60;
 
-            // Find the most recent set that has passed
-            let currentTemperature = sortedSets[sortedSets.length - 1].temperature; // default to last
-            for (let i = 0; i < sortedSets.length; i++) {
-                if (hourFraction >= sortedSets[i].time) {
-                    currentTemperature = sortedSets[i].temperature;
-                } else {
-                    break;
+            // Find which range we're in
+            for (let range of ranges) {
+                if (range.start <= hourFraction && hourFraction < range.end) {
+                    return range.temperature;
                 }
             }
 
-            return currentTemperature;
+            // Should never reach here, but default to first temperature
+            return sets[0].temperature;
         }
 
         // Set initial temperature based on current time
