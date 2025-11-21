@@ -129,11 +129,11 @@ async function main() {
     {
         let sets = [
             // Cold, so we go to sleep
-            { time: 1, temperature: 20.5 },
+            { time: 1, temperature: 18.5 },
             // Warm, to wake up
             { time: 9.5, temperature: 23.5 },
             // Less warm, as our computer will start to get hot around this time
-            { time: 12.5, temperature: 22 },
+            { time: 12.5, temperature: 21 },
         ];
 
         // Convert sets to ranges with wrap-around support
