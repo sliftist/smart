@@ -142,6 +142,7 @@ async function main() {
         void runInfinitePollCallAtStart(timeInMinute, async () => {
             let info = await getThermostat();
             console.log({
+                id: "ecobee",
                 is_cooling: info.properties.is_cooling,
                 is_heating: info.properties.is_heating,
                 is_fan_running: info.properties.is_fan_running,
