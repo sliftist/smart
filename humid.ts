@@ -3,8 +3,9 @@ import { formatNiceDateTime, formatTime, formatVeryNiceDateTime } from "socket-f
 import { linesToObjects, objectsToObservable, watchDirectory, watchFile } from "./logWatcher";
 import { PlugOne } from "./plug";
 import { timeInMinute } from "socket-function/src/misc";
-import { setHeatTemperatureHelper } from "./ac";
+import { getThermostat, setHeatTemperatureHelper } from "./ac";
 import { dailyCallback } from "./scheduler";
+import { runInfinitePoll, runInfinitePollCallAtStart } from "socket-function/src/batching";
 
 /*
 24 outside
@@ -125,6 +126,8 @@ async function main() {
         }
     });
 
+    // TODO: Set temperature based on other probe, using json logging so we can chart the target, set, and actual temperatures.
+    //  - Also might as well read the temperature from the ecobee, so we can determine if it is an offset, or it is just wrong...
     // Cold at night, warm up during the day.
     {
         let sets = [
@@ -135,6 +138,23 @@ async function main() {
             // Less warm, as our computer will start to get hot around this time
             { time: 12.5, temperature: 19 },
         ];
+
+        void runInfinitePollCallAtStart(timeInMinute, async () => {
+            let info = await getThermostat();
+            console.log({
+                is_cooling: info.properties.is_cooling,
+                is_heating: info.properties.is_heating,
+                is_fan_running: info.properties.is_fan_running,
+                temperature_celsius: info.properties.temperature_celsius,
+                temperature_fahrenheit: info.properties.temperature_fahrenheit,
+                heating_set_point_celsius: info.properties.current_climate_setting.heating_set_point_celsius,
+                heating_set_point_fahrenheit: info.properties.current_climate_setting.heating_set_point_fahrenheit,
+                cooling_set_point_celsius: info.properties.current_climate_setting.cooling_set_point_celsius || 0,
+                cooling_set_point_fahrenheit: info.properties.current_climate_setting.cooling_set_point_fahrenheit || 0,
+                hvac_mode_setting: info.properties.current_climate_setting.hvac_mode_setting,
+                fan_mode_setting: info.properties.current_climate_setting.fan_mode_setting,
+            });
+        });
 
         // Convert sets to ranges with wrap-around support
         function setsToRanges(sets: Array<{ time: number, temperature: number }>) {

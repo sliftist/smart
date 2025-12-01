@@ -8,23 +8,25 @@ import { getDevices, getThermostat, setHvacMode, setFanMode, setHeatingTemperatu
 import { dailyCallback } from "./scheduler";
 
 async function main() {
-    // Test Seam API - get devices
+    let info = await getThermostat();
+    console.log(info.properties);
+    // // Test Seam API - get devices
     // const devices = await getDevices();
     // console.log("Seam devices:", JSON.stringify(devices, null, 2));
 
-    // let hourFraction = new Date().getHours() + new Date().getMinutes() / 60;
-    // if (hourFraction >= 2.5 && hourFraction < 10.5) {
-    //     await setHeatTemperatureHelper(21.5);
-    // } else {
-    //     await setHeatTemperatureHelper(23.5);
-    // }
+    // // let hourFraction = new Date().getHours() + new Date().getMinutes() / 60;
+    // // if (hourFraction >= 2.5 && hourFraction < 10.5) {
+    // //     await setHeatTemperatureHelper(21.5);
+    // // } else {
+    // //     await setHeatTemperatureHelper(23.5);
+    // // }
 
-    // dailyCallback(2.5, async () => {
-    //     await setHeatTemperatureHelper(21.5);
-    // });
-    // dailyCallback(10.5, async () => {
-    // });
-    await setHeatTemperatureHelper(23.5);
+    // // dailyCallback(2.5, async () => {
+    // //     await setHeatTemperatureHelper(21.5);
+    // // });
+    // // dailyCallback(10.5, async () => {
+    // // });
+    // await setHeatTemperatureHelper(23.5);
 }
 
 main().catch(console.error).finally(() => process.exit());
