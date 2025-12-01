@@ -141,7 +141,7 @@ async function main() {
 
         void runInfinitePollCallAtStart(timeInMinute, async () => {
             let info = await getThermostat();
-            console.log({
+            console.log(JSON.stringify({
                 id: "ecobee",
                 is_cooling: info.properties.is_cooling,
                 is_heating: info.properties.is_heating,
@@ -154,7 +154,7 @@ async function main() {
                 cooling_set_point_fahrenheit: info.properties.current_climate_setting.cooling_set_point_fahrenheit || 0,
                 hvac_mode_setting: info.properties.current_climate_setting.hvac_mode_setting,
                 fan_mode_setting: info.properties.current_climate_setting.fan_mode_setting,
-            });
+            }));
         });
 
         // Convert sets to ranges with wrap-around support

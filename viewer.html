@@ -955,6 +955,9 @@
                                 const json = JSON.parse(line);
                                 const entryTime = new Date(json.time).getTime();
                                 let id = json.id;
+                                if(id === "ecobee") {
+                                    console.log(json);
+                                }
                                 if(!json.id) continue;
                                 
                                 // These are outside devices
