@@ -960,14 +960,15 @@
                                 }
                                 if(!json.id) continue;
                                 
+                                let hasANumber = /\d/.test(json.id);
                                 // These are outside devices
-                                if (/^[0-9A-Fa-f]{6}$/.test(json.id)) {
+                                if (/^[0-9A-Fa-f]{6}$/.test(json.id) && hasANumber) {
                                     continue;
                                 }
-                                if (/^[0-9A-Fa-f]{7}$/.test(json.id)) {
+                                if (/^[0-9A-Fa-f]{7}$/.test(json.id) && hasANumber) {
                                     continue;
                                 }
-                                if (/^[0-9A-Fa-f]{8}$/.test(json.id)) {
+                                if (/^[0-9A-Fa-f]{8}$/.test(json.id) && hasANumber) {
                                     continue;
                                 }
                                 
