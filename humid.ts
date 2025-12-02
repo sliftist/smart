@@ -27,6 +27,8 @@ const THERMOSTAT_ID = "ecobee";
 const THERMOSTAT_SENSOR = "154";
 const THERMOSTAT_FORCE_OFFSET = 2;
 
+const OUR_THERMOSTAT_ID = "better_ecobee";
+
 // TODO: Maybe change this to use the observable system, so we can respond immediately? Hmm...
 const TEMPERATURE_POLL_RATE = timeInMinute * 2.5;
 
@@ -245,9 +247,11 @@ async function main() {
             } else if (realTemperature < targetTemperature) {
                 console.log(`Turning on heating for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
                 await setHeatingOn();
+                console.log({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celcius: targetTemperature, is_heating: true });
             } else if (realTemperature > targetTemperature) {
                 console.log(`Turning off heating for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
                 await setHeatingOff();
+                console.log({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celcius: targetTemperature, is_heating: false });
             }
         });
 
