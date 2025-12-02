@@ -247,11 +247,11 @@ async function main() {
             } else if (realTemperature < targetTemperature) {
                 console.log(`Turning on heating for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
                 await setHeatingOn();
-                console.log({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celcius: targetTemperature, is_heating: true });
+                console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celcius: targetTemperature, is_heating: true }));
             } else if (realTemperature > targetTemperature) {
                 console.log(`Turning off heating for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
                 await setHeatingOff();
-                console.log({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celcius: targetTemperature, is_heating: false });
+                console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celcius: targetTemperature, is_heating: false }));
             }
         });
 
