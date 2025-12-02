@@ -3,7 +3,7 @@ import { formatNiceDateTime, formatTime, formatVeryNiceDateTime } from "socket-f
 import { linesToObjects, objectsToObservable, watchDirectory, watchFile } from "./logWatcher";
 import { PlugOne } from "./plug";
 import { timeInMinute } from "socket-function/src/misc";
-import { getThermostat, setHeatTemperatureHelper } from "./ac";
+import { getThermostat, setHeatingTemperatureFahrenheit } from "./ac";
 import { dailyCallback } from "./scheduler";
 import { runInfinitePoll, runInfinitePollCallAtStart } from "socket-function/src/batching";
 
@@ -22,6 +22,13 @@ const THROTTLE_TIME = timeInMinute * 2;
 const MAX_DATA_AGE = timeInMinute * 5;
 const MAX_TIME_NO_DATA = timeInMinute * 10;
 const PLUG = PlugOne;
+
+const THERMOSTAT_ID = "ecobee";
+const THERMOSTAT_SENSOR = "154";
+const THERMOSTAT_FORCE_OFFSET = 2;
+
+// TODO: Maybe change this to use the observable system, so we can respond immediately? Hmm...
+const TEMPERATURE_POLL_RATE = timeInMinute * 2.5;
 
 configure({
     enforceActions: "never",
@@ -132,17 +139,17 @@ async function main() {
     {
         let sets = [
             // Cold, so we go to sleep
-            { time: 1, temperature: 18.5 },
+            { time: 1, temperature: 21 },
             // Warm, to wake up
-            { time: 9.5, temperature: 23.5 },
+            { time: 9.5, temperature: 25 },
             // Less warm, as our computer will start to get hot around this time
-            { time: 12.5, temperature: 19 },
+            { time: 12.5, temperature: 23 },
         ];
 
         void runInfinitePollCallAtStart(timeInMinute, async () => {
             let info = await getThermostat();
             console.log(JSON.stringify({
-                id: "ecobee",
+                id: THERMOSTAT_ID,
                 time: Date.now(),
                 is_cooling: info.properties.is_cooling,
                 is_heating: info.properties.is_heating,
@@ -193,15 +200,66 @@ async function main() {
             return sets[0].temperature;
         }
 
-        // Set initial temperature based on current time
-        await setHeatTemperatureHelper(getCurrentTemperatureFromSets(sets));
-
-        // Register daily callbacks
-        for (let set of sets) {
-            dailyCallback(set.time, async () => {
-                await setHeatTemperatureHelper(set.temperature);
-            });
+        function getRealTemperature(): number | undefined {
+            let temperature = allData[THERMOSTAT_SENSOR];
+            if (!temperature) return undefined;
+            if (!("temperature_C" in temperature)) return undefined;
+            let timeOff = Math.abs(new Date(temperature.time).getTime() - Date.now());
+            if (timeOff > MAX_DATA_AGE) {
+                console.warn(`Temperature data is too old for ${THERMOSTAT_SENSOR}. Now is ${formatNiceDateTime(Date.now())}, and the temperature was at ${formatNiceDateTime(+new Date(temperature.time))}, so it is ${formatTime(timeOff)} off`);
+                return undefined;
+            }
+            return temperature.temperature_C;
         }
+
+        // TODO: Support cooling as well? I guess just a mode which *-1 a lot of values/comparisons
+        void runInfinitePollCallAtStart(timeInMinute * 1, async () => {
+            let info = await getThermostat();
+            async function setHeatingOn() {
+                // Just set it higher than it is, to trick it to turn on. If we call this frequently enough, and the granularity is good enough, this will keep it on forever (as it will go up 50% of THERMOSTAT_FORCE_OFFSET, then we set it even higher, etc, etc)
+                let curTemp = info.properties.temperature_fahrenheit;
+                curTemp += THERMOSTAT_FORCE_OFFSET;
+                if (curTemp > 77) {
+                    curTemp = 77;
+                    console.warn(`Tried to set temperature too high (${curTemp}F), limiting to 77F (25C)`);
+                }
+                await setHeatingTemperatureFahrenheit(curTemp);
+            }
+            async function setHeatingOff() {
+                let curTemp = info.properties.temperature_fahrenheit;
+                curTemp -= THERMOSTAT_FORCE_OFFSET;
+                if (curTemp < 60) {
+                    curTemp = 60;
+                    console.warn(`Tried to set temperature too low (${curTemp}F), limiting to 60F (15.6C)`);
+                }
+                await setHeatingTemperatureFahrenheit(curTemp);
+            }
+            let realTemperature = getRealTemperature();
+            if (realTemperature === undefined) {
+                // NOTE: Because our method of setting the heating on or off just changes the set point, It's safest to just leave it as it is. It might be a little bit warm or a little bit hot. It might be very warm, very hot, up to 25 Celsius. Which actually will result in more like 28 Celsius (because ecobees are terrible), Or very cold, getting down to maybe 18 Celsius. However, both of these are acceptable. It's not going to cause runaway problems, such as if the humidifier is on constantly. And reasonably speaking, the temperature won't change by that much, so the set point won't change by that much by the time we notice the data is too stale and stop looking updating. 
+                return;
+            }
+            let targetTemperature = getCurrentTemperatureFromSets(sets);
+            if (realTemperature === targetTemperature) {
+                console.log(`Temperature is equal to target ${realTemperature} at ${formatNiceDateTime(Date.now())}. Not touching state`);
+            } else if (realTemperature < targetTemperature) {
+                console.log(`Turning on heating for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
+                await setHeatingOn();
+            } else if (realTemperature > targetTemperature) {
+                console.log(`Turning off heating for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
+                await setHeatingOff();
+            }
+        });
+
+        // // Set initial temperature based on current time
+        // await setHeatTemperatureHelper(getCurrentTemperatureFromSets(sets));
+
+        // // Register daily callbacks
+        // for (let set of sets) {
+        //     dailyCallback(set.time, async () => {
+        //         await setHeatTemperatureHelper(set.temperature);
+        //     });
+        // }
     }
 }
 

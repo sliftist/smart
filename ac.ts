@@ -46,7 +46,23 @@ export async function getDevices() {
     return result.devices;
 }
 
-export async function getThermostat() {
+export async function getThermostat(): Promise<{
+    properties: {
+        is_cooling: boolean;
+        is_heating: boolean;
+        is_fan_running: boolean;
+        temperature_celsius: number;
+        temperature_fahrenheit: number;
+        current_climate_setting: {
+            hvac_mode_setting: "off" | "cool" | "heat" | "heat_cool";
+            fan_mode_setting: "auto" | "on";
+            cooling_set_point_celsius: number;
+            cooling_set_point_fahrenheit: number;
+            heating_set_point_celsius: number;
+            heating_set_point_fahrenheit: number;
+        };
+    };
+}> {
     const result = await seamApiCall("/devices/get", { device_id: THERMOSTAT_ID });
     return result.device;
 }
@@ -91,12 +107,4 @@ export async function setHeatCoolTemperatures(heatingCelsius: number, coolingCel
         heating_set_point_celsius: heatingCelsius,
         cooling_set_point_celsius: coolingCelsius,
     });
-}
-
-
-export async function setHeatTemperatureHelper(celsius: number) {
-    let info = await getThermostat();
-    console.log("Current thermostat state:", info.properties.current_climate_setting);
-    console.log("Setting temperature to", celsius);
-    await setHeatingTemperature(celsius);
 }
