@@ -1,7 +1,7 @@
 import { configure, autorun, observable } from "mobx";
 import { formatNiceDateTime, formatTime, formatVeryNiceDateTime } from "socket-function/src/formatting/format";
 import { linesToObjects, objectsToObservable, watchDirectory, watchFile } from "./logWatcher";
-import { PlugOne } from "./plug";
+import { PlugFive, PlugOne } from "./plug";
 import { timeInMinute } from "socket-function/src/misc";
 import { getThermostat, setHeatingTemperatureFahrenheit } from "./ac";
 import { dailyCallback } from "./scheduler";
@@ -25,7 +25,7 @@ const PLUG = PlugOne;
 
 const THERMOSTAT_ID = "ecobee";
 const THERMOSTAT_SENSOR = "154";
-const THERMOSTAT_FORCE_OFFSET = 2;
+const THERMOSTAT_FORCE_OFFSET = 3;
 
 const OUR_THERMOSTAT_ID = "better_ecobee";
 
@@ -236,22 +236,35 @@ async function main() {
                 }
                 await setHeatingTemperatureFahrenheit(curTemp);
             }
+            async function setSuperCooling(status: boolean) {
+                console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), super_cooling: status }));
+                await PlugFive.setOn(status);
+            }
             let realTemperature = getRealTemperature();
             if (realTemperature === undefined) {
+                await setSuperCooling(false);
                 // NOTE: Because our method of setting the heating on or off just changes the set point, It's safest to just leave it as it is. It might be a little bit warm or a little bit hot. It might be very warm, very hot, up to 25 Celsius. Which actually will result in more like 28 Celsius (because ecobees are terrible), Or very cold, getting down to maybe 18 Celsius. However, both of these are acceptable. It's not going to cause runaway problems, such as if the humidifier is on constantly. And reasonably speaking, the temperature won't change by that much, so the set point won't change by that much by the time we notice the data is too stale and stop looking updating. 
                 return;
             }
             let targetTemperature = getCurrentTemperatureFromSets(sets);
             if (realTemperature === targetTemperature) {
                 console.log(`Temperature is equal to target ${realTemperature} at ${formatNiceDateTime(Date.now())}. Not touching state`);
+                await setSuperCooling(false);
             } else if (realTemperature < targetTemperature) {
                 console.log(`Turning on heating for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
                 await setHeatingOn();
+                await setSuperCooling(false);
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celsius: targetTemperature, is_heating: true }));
             } else if (realTemperature > targetTemperature) {
                 console.log(`Turning off heating for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
                 await setHeatingOff();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celsius: targetTemperature, is_heating: false }));
+                if (realTemperature > targetTemperature + 1.5) {
+                    console.log(`Turning on super cooling for due to temperature being way too high`);
+                    await setSuperCooling(true);
+                } else {
+                    await setSuperCooling(false);
+                }
             }
         });
 
