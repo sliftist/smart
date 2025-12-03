@@ -41,6 +41,8 @@ const OUR_THERMOSTAT_ID = "better_ecobee";
 // TODO: Maybe change this to use the observable system, so we can respond immediately? Hmm...
 const TEMPERATURE_POLL_RATE = timeInMinute * 2.5;
 
+const SUPER_COOLING_TEMPERATURE_THRESHOLD = 1;
+
 let TEMPERATURE_PLAN = [
     // Cold, so we go to sleep (takes a while to cool down though)
     { time: 0, temperature: 23 },
@@ -269,7 +271,7 @@ async function main() {
                 console.log(`Turning off heating for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
                 await setHeatingOff();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celsius: targetTemperature, is_heating: false }));
-                if (realTemperature > targetTemperature + 1.5) {
+                if (realTemperature > targetTemperature + SUPER_COOLING_TEMPERATURE_THRESHOLD) {
                     console.log(`Turning on super cooling for due to temperature being way too high`);
                     await setSuperCooling(true);
                 } else {
