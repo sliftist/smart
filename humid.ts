@@ -41,6 +41,16 @@ const OUR_THERMOSTAT_ID = "better_ecobee";
 // TODO: Maybe change this to use the observable system, so we can respond immediately? Hmm...
 const TEMPERATURE_POLL_RATE = timeInMinute * 2.5;
 
+let TEMPERATURE_PLAN = [
+    // Cold, so we go to sleep (takes a while to cool down though)
+    { time: 0, temperature: 22 },
+    // Warm, to wake up
+    { time: 9.5, temperature: 26 },
+    // Less warm, as our computer will start to get hot around this time
+    { time: 12.5, temperature: 24 },
+];
+
+
 configure({
     enforceActions: "never",
     reactionScheduler(callback) {
@@ -148,15 +158,6 @@ async function main() {
     //  - Also might as well read the temperature from the ecobee, so we can determine if it is an offset, or it is just wrong...
     // Cold at night, warm up during the day.
     {
-        let sets = [
-            // Cold, so we go to sleep
-            { time: 1.5, temperature: 21 },
-            // Warm, to wake up
-            { time: 9.5, temperature: 26 },
-            // Less warm, as our computer will start to get hot around this time
-            { time: 12.5, temperature: 24 },
-        ];
-
         void runInfinitePollCallAtStart(timeInMinute, async () => {
             let info = await getThermostat();
             console.log(JSON.stringify({
@@ -224,7 +225,7 @@ async function main() {
         }
 
         // TODO: Support cooling as well? I guess just a mode which *-1 a lot of values/comparisons
-        void runInfinitePollCallAtStart(timeInMinute * 1, async () => {
+        void runInfinitePollCallAtStart(TEMPERATURE_POLL_RATE, async () => {
             let info = await getThermostat();
             async function setHeatingOn() {
                 // Just set it higher than it is, to trick it to turn on. If we call this frequently enough, and the granularity is good enough, this will keep it on forever (as it will go up 50% of THERMOSTAT_FORCE_OFFSET, then we set it even higher, etc, etc)
@@ -255,7 +256,7 @@ async function main() {
                 // NOTE: Because our method of setting the heating on or off just changes the set point, It's safest to just leave it as it is. It might be a little bit warm or a little bit hot. It might be very warm, very hot, up to 25 Celsius. Which actually will result in more like 28 Celsius (because ecobees are terrible), Or very cold, getting down to maybe 18 Celsius. However, both of these are acceptable. It's not going to cause runaway problems, such as if the humidifier is on constantly. And reasonably speaking, the temperature won't change by that much, so the set point won't change by that much by the time we notice the data is too stale and stop looking updating. 
                 return;
             }
-            let targetTemperature = getCurrentTemperatureFromSets(sets);
+            let targetTemperature = getCurrentTemperatureFromSets(TEMPERATURE_PLAN);
             if (realTemperature === targetTemperature) {
                 console.log(`Temperature is equal to target ${realTemperature} at ${formatNiceDateTime(Date.now())}. Not touching state`);
                 await setSuperCooling(false);
