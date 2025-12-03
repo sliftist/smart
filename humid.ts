@@ -16,6 +16,15 @@ import { runInfinitePoll, runInfinitePollCallAtStart } from "socket-function/src
 211 bedroom window
 */
 
+process.on("unhandledRejection", (reason, promise) => {
+    console.error("Unhandled rejection:", reason);
+    console.error("Promise:", promise);
+});
+
+process.on("uncaughtException", (error) => {
+    console.error("Uncaught exception:", error);
+});
+
 const HUMIDITY_ID = "132";
 const HUMIDITY = 50;
 const THROTTLE_TIME = timeInMinute * 2;
