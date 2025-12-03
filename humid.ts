@@ -43,7 +43,7 @@ const TEMPERATURE_POLL_RATE = timeInMinute * 2.5;
 
 let TEMPERATURE_PLAN = [
     // Cold, so we go to sleep (takes a while to cool down though)
-    { time: 0, temperature: 22 },
+    { time: 0, temperature: 23 },
     // Warm, to wake up
     { time: 9.5, temperature: 26 },
     // Less warm, as our computer will start to get hot around this time
