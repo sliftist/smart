@@ -41,11 +41,11 @@ const OUR_THERMOSTAT_ID = "better_ecobee";
 // TODO: Maybe change this to use the observable system, so we can respond immediately? Hmm...
 const TEMPERATURE_POLL_RATE = timeInMinute * 2.5;
 
-const SUPER_COOLING_TEMPERATURE_THRESHOLD = 1;
+const SUPER_COOLING_TEMPERATURE_THRESHOLD = 0.5;
 
 let TEMPERATURE_PLAN = [
-    // Cold, so we go to sleep (takes a while to cool down though)
-    { time: 0, temperature: 23 },
+    // Cold, so we go to sleep
+    { time: 0, temperature: 22 },
     // Warm, to wake up
     { time: 9.5, temperature: 26 },
     // Less warm, as our computer will start to get hot around this time
