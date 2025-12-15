@@ -26,7 +26,7 @@ process.on("uncaughtException", (error) => {
 });
 
 const HUMIDITY_ID = "132";
-const HUMIDITY = 60;
+const HUMIDITY = 70;
 const THROTTLE_TIME = timeInMinute * 2;
 const MAX_DATA_AGE = timeInMinute * 5;
 const MAX_TIME_NO_DATA = timeInMinute * 10;
@@ -45,11 +45,11 @@ const SUPER_COOLING_TEMPERATURE_THRESHOLD = 1;
 
 let TEMPERATURE_PLAN = [
     // Cold, so we go to sleep
-    { time: 0, temperature: 22 },
+    { time: 0, temperature: 23 },
     // Warm, to wake up
-    { time: 9.5, temperature: 26 },
+    { time: 9.5, temperature: 27 },
     // Less warm, as our computer will start to get hot around this time
-    { time: 12.5, temperature: 24 },
+    { time: 12.5, temperature: 25 },
 ];
 
 
