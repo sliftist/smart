@@ -45,11 +45,11 @@ const SUPER_COOLING_TEMPERATURE_THRESHOLD = 1.5;
 
 let TEMPERATURE_PLAN = [
     // Cold, so we go to sleep
-    { time: 0, temperature: 23 },
+    { time: 0, temperature: 21 },
     // Warm, to wake up
-    { time: 9.5, temperature: 26 },
+    { time: 9.5, temperature: 24 },
     // Less warm, as our computer will start to get hot around this time
-    { time: 12.5, temperature: 24 },
+    { time: 12.5, temperature: 22 },
 ];
 
 
