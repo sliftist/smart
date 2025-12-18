@@ -36,6 +36,9 @@ const THERMOSTAT_ID = "ecobee";
 const THERMOSTAT_SENSOR = "154";
 const THERMOSTAT_FORCE_OFFSET = 3;
 
+const THERMAL_LIMIT_ID = "173";
+const THERMAL_LIMIT = 25.5;
+
 const OUR_THERMOSTAT_ID = "better_ecobee";
 
 // TODO: Maybe change this to use the observable system, so we can respond immediately? Hmm...
@@ -225,11 +228,28 @@ async function main() {
             }
             return temperature.temperature_C;
         }
+        function getThermalLimitProbe(): number | undefined {
+            let thermalLimit = allData[THERMAL_LIMIT_ID];
+            if (!thermalLimit) return undefined;
+            if (!("temperature_C" in thermalLimit)) return undefined;
+            let timeOff = Math.abs(new Date(thermalLimit.time).getTime() - Date.now());
+            if (timeOff > MAX_DATA_AGE) {
+                console.warn(`Thermal limit data is too old for ${THERMAL_LIMIT_ID}. Now is ${formatNiceDateTime(Date.now())}, and the thermal limit was at ${formatNiceDateTime(+new Date(thermalLimit.time))}, so it is ${formatTime(timeOff)} off`);
+                return undefined;
+            }
+            return thermalLimit.temperature_C;
+        }
 
         // TODO: Support cooling as well? I guess just a mode which *-1 a lot of values/comparisons
         void runInfinitePollCallAtStart(TEMPERATURE_POLL_RATE, async () => {
             let info = await getThermostat();
             async function setHeatingOn() {
+                let thermalLimit = getThermalLimitProbe();
+                if (thermalLimit !== undefined && thermalLimit >= THERMAL_LIMIT) {
+                    console.log(`Thermal limit hit ${thermalLimit} >= ${THERMAL_LIMIT} at ${formatNiceDateTime(Date.now())}. Ignoring heating request, and ensuring heat is off`);
+                    await setHeatingOff();
+                    return;
+                }
                 // Just set it higher than it is, to trick it to turn on. If we call this frequently enough, and the granularity is good enough, this will keep it on forever (as it will go up 50% of THERMOSTAT_FORCE_OFFSET, then we set it even higher, etc, etc)
                 let curTemp = info.properties.temperature_fahrenheit;
                 curTemp += THERMOSTAT_FORCE_OFFSET;
@@ -258,7 +278,9 @@ async function main() {
                 // NOTE: Because our method of setting the heating on or off just changes the set point, It's safest to just leave it as it is. It might be a little bit warm or a little bit hot. It might be very warm, very hot, up to 25 Celsius. Which actually will result in more like 28 Celsius (because ecobees are terrible), Or very cold, getting down to maybe 18 Celsius. However, both of these are acceptable. It's not going to cause runaway problems, such as if the humidifier is on constantly. And reasonably speaking, the temperature won't change by that much, so the set point won't change by that much by the time we notice the data is too stale and stop looking updating. 
                 return;
             }
+
             let targetTemperature = getCurrentTemperatureFromSets(TEMPERATURE_PLAN);
+
             if (realTemperature === targetTemperature) {
                 console.log(`Temperature is equal to target ${realTemperature} at ${formatNiceDateTime(Date.now())}. Not touching state`);
                 await setSuperCooling(false);
