@@ -26,7 +26,7 @@ process.on("uncaughtException", (error) => {
 });
 
 const HUMIDITY_ID = "132";
-const HUMIDITY = 45;
+const HUMIDITY = 53;
 const THROTTLE_TIME = timeInMinute * 2;
 const MAX_DATA_AGE = timeInMinute * 5;
 const MAX_TIME_NO_DATA = timeInMinute * 10;

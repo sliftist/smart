@@ -25,6 +25,26 @@ export class Plug {
         let creds = await getCreds();
         return await tsplinkconnect.loginDevice(creds.email, creds.password, { deviceMac: this.deviceMac } as any);
     }
+    public async getInfo(): Promise<{
+        device_on: boolean;
+    }> {
+        const device = await this.getDevice();
+        const info = await device.getDeviceInfo();
+        return info;
+    }
+    public async getEnergyData(): Promise<{
+        today_runtime: number;
+        month_runtime: number;
+        today_energy: number;
+        month_energy: number;
+        local_time: string;
+        electricity_charge: number[];
+        current_power: number;
+    }> {
+        const device = await this.getDevice();
+        const info = await device.getEnergyUsage() as any;
+        return info;
+    }
     public async getOn(): Promise<boolean> {
         const device = await this.getDevice();
         const info = await device.getDeviceInfo();
@@ -54,5 +74,7 @@ export const PlugTwo = new Plug(PLUG_TWO);
 export const PlugThree = new Plug(PLUG_THREE);
 // uv cleaner reservoir
 export const PlugFour = new Plug(PLUG_FOUR);
+// outside fan
 export const PlugFive = new Plug(PLUG_FIVE);
+// toaster
 export const PlugSix = new Plug(PLUG_SIX);
