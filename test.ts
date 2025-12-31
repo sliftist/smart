@@ -2,7 +2,7 @@ import tsplinkconnect from "tp-link-tapo-connect";
 import { lazy } from "socket-function/src/caching";
 import * as fs from "fs";
 import * as os from "os";
-import { PlugFive, PlugOne, PlugSix, PlugThree } from "./plug";
+import { PlugFive, PlugOne, PlugSeven, PlugSix, PlugThree, PlugTwo } from "./plug";
 import { delay } from "socket-function/src/batching";
 import { getDevices, getThermostat, setHvacMode, setFanMode, setHeatingTemperature, setHeatingTemperatureFahrenheit } from "./ac";
 import { dailyCallback } from "./scheduler";
@@ -13,8 +13,9 @@ async function main() {
 
     // let plugInfo = await PlugOne.getInfo();
     // console.log(plugInfo);
-    let energyData = await PlugOne.getEnergyData();
-    console.log(energyData);
+    await PlugSeven.setOn(false);
+    // let energyData = await PlugTwo.getEnergyData();
+    // console.log(energyData);
     // // Test Seam API - get devices
     // const devices = await getDevices();
     // console.log("Seam devices:", JSON.stringify(devices, null, 2));

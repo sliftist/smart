@@ -3,13 +3,7 @@ import { lazy } from "socket-function/src/caching";
 import * as fs from "fs";
 import * as os from "os";
 
-// Set up in app, and then read from there, or just read off the device itself.
-const PLUG_ONE = "8C902DF801D2";
-const PLUG_TWO = "8C902DF80E35";
-const PLUG_THREE = "CCBABD05A2E2";
-const PLUG_FOUR = "CCBABD0592DE";
-const PLUG_FIVE = "CCBABD059E1E";
-const PLUG_SIX = "CCBABD059D36";
+
 
 const getCreds = lazy(async () => {
     let contents = await fs.promises.readFile(os.homedir() + "/tplink.json", "utf8");
@@ -66,15 +60,25 @@ export class Plug {
     }
 }
 
+// Set up in app, and read off the physical device
+
+
 // humidifier
-export const PlugOne = new Plug(PLUG_ONE);
+export const PlugOne = new Plug("8C902DF801D2");
 // monitors
-export const PlugTwo = new Plug(PLUG_TWO);
+export const PlugTwo = new Plug("8C902DF80E35");
 // uv cleaner
-export const PlugThree = new Plug(PLUG_THREE);
+export const PlugThree = new Plug("CCBABD05A2E2");
 // uv cleaner reservoir
-export const PlugFour = new Plug(PLUG_FOUR);
+export const PlugFour = new Plug("CCBABD0592DE");
 // outside fan
-export const PlugFive = new Plug(PLUG_FIVE);
+export const PlugFive = new Plug("CCBABD059E1E");
 // toaster
-export const PlugSix = new Plug(PLUG_SIX);
+export const PlugSix = new Plug("CCBABD059D36");
+
+export const PlugSeven = new Plug("3C7895B76C37");
+export const PlugEight = new Plug("3C7895B75EC6");
+export const PlugNine = new Plug("3C7895B75EB8");
+export const PlugTen = new Plug("3C7895B76D82");
+export const PlugEleven = new Plug("3C7895B76C33");
+export const PlugTwelve = new Plug("3C7895B764D1");

@@ -1,7 +1,7 @@
 import { PlugSix } from "./plug";
 import { delay } from "socket-function/src/batching";
 import { exec } from "child_process";
-import { formatNumber, formatTime } from "socket-function/src/formatting/format";
+import { formatNumber } from "socket-function/src/formatting/format";
 
 async function showWindowsNotification(title: string, message: string) {
     // Use PowerShell to show a Windows balloon notification
@@ -29,42 +29,67 @@ $balloon.Dispose()
     });
 }
 
+function formatTime(duration: number) {
+    const totalSeconds = Math.floor(duration / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+
+
 async function main() {
     console.log("Starting toaster monitor...");
 
     let isToasting = false;
     let toastingStartTime: number | null = null;
+    let lastToastingDuration = 0;
     let toastingEndTime: number | null = null;
+    let heatTime = 0;
+    let prevTime = 0;
+
+    const isOnThreshold = 5 * 1000;
+    const isHeatThreshold = 100 * 1000;
 
     while (true) {
         try {
             const energyData = await PlugSix.getEnergyData();
             const currentPower = energyData.current_power;
-            let nextIsToasting = currentPower > 10 * 1000;
+            // The air fryer runs for about 30 or 40 seconds after it finishes with the fans to help cool it down, which is very useful. The fans take about ten watts, So we need to consider 10 watts to still be on.
+            let nextIsToasting = currentPower > isOnThreshold;
+
+
+            if (currentPower > isHeatThreshold && prevTime) {
+                heatTime += (Date.now() - prevTime);
+            }
+
+            prevTime = Date.now();
 
             if (!isToasting && nextIsToasting) {
                 // Toaster just turned on
                 isToasting = true;
                 toastingStartTime = Date.now();
                 console.log("Toaster started!");
+                heatTime = 0;
             } else if (isToasting && !nextIsToasting) {
                 // Toaster just turned off
                 isToasting = false;
                 toastingEndTime = Date.now();
-                const duration = toastingStartTime ? toastingEndTime - toastingStartTime : 0;
-                const durationText = formatTime(duration);
-                console.log(`Toaster finished after ${durationText}! Showing notification...`);
-                showWindowsNotification("Toaster", `Food is done! Toasted for ${durationText}`).catch(console.error);
+                const duration = toastingEndTime - toastingStartTime!;
+                lastToastingDuration = duration;
+                console.log(`Toaster finished after ${formatTime(duration)}! Showing notification...`);
+                showWindowsNotification("Toaster", `Food is done! Toasted for ${formatTime(duration)} (${formatTime(heatTime)} heat, ${formatTime(duration - heatTime)} fan)`).catch(console.error);
                 toastingStartTime = null;
+                prevTime = 0;
             }
 
             let statusText: string;
             if (nextIsToasting && toastingStartTime) {
                 const duration = Date.now() - toastingStartTime;
-                statusText = `Toasting for ${formatTime(duration)}`;
+                statusText = `Toasting for ${formatTime(duration)} (${formatTime(heatTime)} heat, ${formatTime(duration - heatTime)} fan)`;
             } else if (toastingEndTime) {
                 const timeSince = Date.now() - toastingEndTime;
-                statusText = `Last toast ${formatTime(timeSince)} ago, for ${formatTime(toastingEndTime - toastingStartTime!)}`;
+                statusText = `Last toast ${formatTime(timeSince)} ago, for ${formatTime(lastToastingDuration)} (${formatTime(heatTime)} heat, ${formatTime(lastToastingDuration - heatTime)} fan)`;
             } else {
                 statusText = `Waiting for toast`;
             }
