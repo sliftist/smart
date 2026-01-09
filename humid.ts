@@ -37,7 +37,7 @@ const THERMOSTAT_SENSOR = "154";
 const THERMOSTAT_FORCE_OFFSET = 3;
 
 const THERMAL_LIMIT_ID = "173";
-const THERMAL_LIMIT = 25.5;
+const THERMAL_LIMIT = 25;
 
 const OUR_THERMOSTAT_ID = "better_ecobee";
 
