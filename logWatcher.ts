@@ -49,6 +49,27 @@ function createAsyncIterable<T>(): {
     };
 }
 
+// Helper function to check if a log file is from the last week
+function isFileWithinLastWeek(filename: string): boolean {
+    // Extract date from filename pattern: YYYY-MM-DD-namespace-...
+    const dateMatch = filename.match(/^(\d{4})-(\d{2})-(\d{2})-/);
+    if (!dateMatch) {
+        // If we can't parse the date, include the file to be safe
+        return true;
+    }
+
+    const [, year, month, day] = dateMatch;
+    const fileDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Reset hours to compare just dates
+    fileDate.setHours(0, 0, 0, 0);
+    oneWeekAgo.setHours(0, 0, 0, 0);
+
+    return fileDate >= oneWeekAgo;
+}
+
 // Returns all files, and new files, returning the full path
 export function watchDirectory(dirPath: string): AsyncIterable<string> {
     const { iterable, push, close } = createAsyncIterable<string>();
@@ -56,18 +77,6 @@ export function watchDirectory(dirPath: string): AsyncIterable<string> {
 
     // Initialize by reading existing files and setting up watcher
     void (async () => {
-        // First, push all existing files
-        const existingFiles = await fsPromises.readdir(dirPath);
-        for (const file of existingFiles) {
-            const fullPath = path.join(dirPath, file);
-            const stat = await fsPromises.stat(fullPath);
-            if (stat.isFile()) {
-                seenFiles.add(file);
-                push(fullPath);
-            }
-        }
-
-        // Then watch for new files
         const watcher = fs.watch(dirPath, { persistent: false });
 
         watcher.on("change", async (eventType, filename) => {
@@ -75,7 +84,7 @@ export function watchDirectory(dirPath: string): AsyncIterable<string> {
                 const fullPath = path.join(dirPath, filename);
                 try {
                     const stat = await fsPromises.stat(fullPath);
-                    if (stat.isFile() && !seenFiles.has(filename)) {
+                    if (stat.isFile() && !seenFiles.has(filename) && isFileWithinLastWeek(filename)) {
                         seenFiles.add(filename);
                         push(fullPath);
                     }
@@ -84,6 +93,17 @@ export function watchDirectory(dirPath: string): AsyncIterable<string> {
                 }
             }
         });
+
+        const existingFiles = await fsPromises.readdir(dirPath);
+        for (const file of existingFiles) {
+            const fullPath = path.join(dirPath, file);
+            const stat = await fsPromises.stat(fullPath);
+            if (stat.isFile() && isFileWithinLastWeek(file)) {
+                seenFiles.add(file);
+                push(fullPath);
+            }
+        }
+        console.log(`[LogWatcher] Finished loading ${existingFiles.length} files`);
     })();
 
     return iterable;
