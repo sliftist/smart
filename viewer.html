@@ -303,7 +303,7 @@
             </div>
         </div>
 
-        <div id="chartContainer" class="chart-container" style="display: none;">
+        <div id="chartContainer" class="chart-container">
             <div class="chart-wrapper">
                 <canvas id="chart"></canvas>
             </div>
@@ -328,6 +328,12 @@
             </div>
         </div>
     </div>
+    <script>
+        // HACK: On resume from sleep the file handles will be broken (sometimes?). Just reload every hour so it fixes eventually.
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000 * 60 * 60 * 1);
+    </script>
 
     <script>
         let logsDirectoryHandle = null;
@@ -969,15 +975,19 @@
                 currentData = [];
 
                 let time = Date.now();
+                console.log(`Starting load of ${filesToLoad.length} files`);
                 
                 // Load all files in the range
                 await Promise.all(filesToLoad.map(async (fileInfo) => {
+                    let time = Date.now();
                     const file = await fileInfo.handle.getFile();
                     const text = await file.text();
                     const lines = text.trim().split('\n');
-                    console.log(`Read ${text.length} characters in`);
-                    
-                    let time = Date.now();
+                    console.log(`Read ${text.length} characters in ${((Date.now() - time) / 1000).toFixed(2)}s`);
+                    time = Date.now();
+
+                    let newDatums = 0;
+
                     for (const line of lines) {
                         if (line.trim()) {
                             try {
@@ -1008,6 +1018,7 @@
                                     // Store time as timestamp (number) instead of string
                                     json.time = entryTime;
                                     currentData.push(json);
+                                    newDatums++;
                                 }
                             } catch (e) {
                                 // Skip invalid JSON lines
@@ -1015,9 +1026,10 @@
                         }
                     }
                     let duration = Date.now() - time;
-                    console.log(`Loaded ${lines.length} lines in ${(duration / 1000).toFixed(2)}s`);
+                    console.log(`Loaded ${lines.length} lines in ${(duration / 1000).toFixed(2)}s, had ${newDatums} new datums, ${currentData.length} total datums`);
+                    drawChart();
                 }).map(x => x.catch(err => {
-                    console.error(`Error loading file ${fileInfo.handle.name}: ${err}`);
+                    console.error(`Error loading file ${err}`);
                 })));
 
                 // Sort by time (now numeric timestamps)
@@ -1183,10 +1195,12 @@
             const selectedMetrics = getSelectedMetrics();
             
             if (currentData.length === 0) {
+                console.log('No data to draw');
                 return;
             }
 
             if (selectedMetrics.length === 0) {
+                console.log('No metrics to draw');
                 return;
             }
 
@@ -1401,6 +1415,7 @@
                 });
             });
 
+            console.log(`Rendering ${datasets.length} datasets, ${datasets.reduce((acc, dataset) => acc + dataset.data.length, 0)} data points`);
             // Create the chart
             const ctx = document.getElementById('chart').getContext('2d');
             chartInstance = new Chart(ctx, {
@@ -1486,6 +1501,8 @@
                     scales: {
                         x: {
                             type: 'time',
+                            min: Math.min(selectedStartDate, Date.now()),
+                            max: Math.min(selectedEndDate, Date.now()),
                             time: {
                                 displayFormats: {
                                     hour: 'HH:mm',
