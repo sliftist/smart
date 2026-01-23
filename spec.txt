@@ -7,6 +7,25 @@ TODO: Web interface to manually control switches
 
 1) Floor plan with visualized metrics (not over time, but we can seek times to see them change)
 
+
+TODO: State tracking
+    1) Create a model that takes as inputs any changes to the state such as turning on the heater, turning on the cooler.
+        - The model will also have constant parameters. 
+        - I imagine the model should just be energy-based, where we just have the pool of energy, or rather, I guess, two pools. And then there's a lag time to go between them. And that base, the time that it takes for the energy to go between them depends on how much energy differential there is. And then there's also how much energy is being lost from the system, and then the heater adds energy to the system. 
+    2) For any chunk of time, probably around an hour, we should find which model constant parameters will create the most accurate tracking of the actual data.
+    2.1) We should then for historical data plot these model constants over time. Just to verify that they're not completely random or redundant.
+    2.2) We should also see if there's any other external factors which might control these model constants. 
+        a) Outside temperature
+        b) Sunlight level outside
+        c) Additional events (showering, when we open our bedroom door, etc)
+    3) Then we just take the last hour, use that to find the parameters, And then use that to extrapolate to see what the future temperature will be. Then we look at our different actions. We can probably look at every different action. and use those to see what that will cause the future temperature to be. And then we can pick the one which is closest to our target parameters (probably just average temperature).
+    NOTE: This means we don't actually ever need something that explicitly predicts the future temperatures. I think this is fine, as long as we make sure our model is accurate, and not just a polynomial/sinusoidal With enough parameters that will fit basically any periodic function, But when extrapolated, will grow rapidly. If the model is actually based on reality, I think it will extrapolate quite well. 
+    4) We can then take this extrapolation model and determine how accurate it is based on the historical data.
+        a) Determine if it has any bias in either direction. 
+        b) Determine how much the error increases when extrapolating future data vs the error on fitting the known data.
+    5) I think we should manually adjust the heat for. Really weird patterns to create difficult data to predict. That way we can really determine if it's actually accounting for the parameters. or just kind of roughly staying the same temperature, which works because we want the temperature to stay roughly the same. So that's what our thermostat presently does. 
+
+
 TODO: Variable rate humidifier
     - THEN, if it is 1 tick above the target, reduce the rate by 10%, then at 2 ticks reduce by 20%, etc.
             - OH! And at 2 ticks above, reduce by more slightly, as time goes on, as we don't just want to stop it, we want to reduce it.
