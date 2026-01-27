@@ -338,7 +338,8 @@
         let visibleDatasets = new Set(); // Track visible dataset IDs (default all hidden)
         let autoRefreshInterval = null; // Track auto-refresh interval
         let idLabels = {}; // Store labels for IDs
-        let consecutiveRefreshFailures = 0; // Track consecutive failed refresh attempts
+        let lastSuccessfulDataLoad = Date.now(); // Track last successful data load
+        let watchdogInterval = null; // Track watchdog interval
 
         const colors = [
             '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7',
@@ -897,6 +898,9 @@
             // Try to initialize with saved handle
             await initializeWithSavedHandle();
             
+            // Start watchdog timer to detect hung loads
+            startWatchdog();
+            
             // If we have a handle and permissions, load data and start auto-refresh
             if (logsDirectoryHandle && document.getElementById('dateRangeContainer').style.display === 'block') {
                 if (selectedStartDate && selectedEndDate) {
@@ -1022,9 +1026,7 @@
                     let duration = Date.now() - time;
                     console.log(`Loaded ${lines.length} lines in ${(duration / 1000).toFixed(2)}s, had ${newDatums} new datums, ${currentData.length} total datums`);
                     drawChart();
-                }).map(x => x.catch(err => {
-                    console.error(`Error loading file ${err}`);
-                })));
+                }));
 
                 // Sort by time (now numeric timestamps)
                 currentData.sort((a, b) => a.time - b.time);
@@ -1037,8 +1039,8 @@
                 document.getElementById('labelIds').style.display = 'inline-block';
                 document.getElementById('error').style.display = 'none';
                 
-                // Reset failure counter on successful manual load
-                consecutiveRefreshFailures = 0;
+                // Update last successful data load timestamp
+                lastSuccessfulDataLoad = Date.now();
                 
                 updateURL();
                 drawChart();
@@ -1153,60 +1155,20 @@
             
             autoRefreshInterval = setInterval(async () => {
                 if (logsDirectoryHandle && selectedStartDate && selectedEndDate) {
-                    try {
-                        // Capture current data state before refresh
-                        const previousDataLength = currentData.length;
-                        const previousDataHash = currentData.length > 0 
-                            ? currentData[currentData.length - 1].time 
-                            : null;
-                        
-                        // Refresh the list of available files to pick up new log files
-                        await loadAvailableFiles();
-                        
-                        // If live range is enabled, update the range first
-                        const liveRangeCheckbox = document.getElementById('liveRangeCheckbox');
-                        if (liveRangeCheckbox && liveRangeCheckbox.checked) {
-                            const { start, end } = setLiveRange();
-                            await loadDateRange(start, end);
-                        } else {
-                            // Otherwise just reload the current range
-                            await loadDateRange(selectedStartDate, selectedEndDate);
-                        }
-                        
-                        // Check if data actually changed
-                        const newDataLength = currentData.length;
-                        const newDataHash = currentData.length > 0 
-                            ? currentData[currentData.length - 1].time 
-                            : null;
-                        
-                        if (newDataLength === previousDataLength && newDataHash === previousDataHash) {
-                            // No new data received
-                            consecutiveRefreshFailures++;
-                            console.warn(`Auto-refresh: No new data (failure ${consecutiveRefreshFailures}/2)`);
-                        } else {
-                            // Data changed, reset failure counter
-                            consecutiveRefreshFailures = 0;
-                            console.log('Auto-refresh: Data updated successfully');
-                        }
-                        
-                        // If 2 consecutive failures, reload the page
-                        if (consecutiveRefreshFailures >= 2) {
-                            console.error('Auto-refresh: 2 consecutive failures detected, reloading page...');
-                            location.reload();
-                        }
-                    } catch (error) {
-                        // Error occurred during refresh
-                        consecutiveRefreshFailures++;
-                        console.error(`Auto-refresh error (failure ${consecutiveRefreshFailures}/2):`, error);
-                        
-                        // If 2 consecutive failures, reload the page
-                        if (consecutiveRefreshFailures >= 2) {
-                            console.error('Auto-refresh: 2 consecutive failures detected, reloading page...');
-                            location.reload();
-                        }
+                    // Refresh the list of available files to pick up new log files
+                    await loadAvailableFiles();
+                    
+                    // If live range is enabled, update the range first
+                    const liveRangeCheckbox = document.getElementById('liveRangeCheckbox');
+                    if (liveRangeCheckbox && liveRangeCheckbox.checked) {
+                        const { start, end } = setLiveRange();
+                        await loadDateRange(start, end);
+                    } else {
+                        // Otherwise just reload the current range
+                        await loadDateRange(selectedStartDate, selectedEndDate);
                     }
                 }
-            }, 1000 * 60 * 5);
+            }, 1000 * 60 * 5); // Refresh every 5 minutes
         }
 
         function stopAutoRefresh() {
@@ -1214,8 +1176,29 @@
                 clearInterval(autoRefreshInterval);
                 autoRefreshInterval = null;
             }
-            // Reset failure counter when stopping auto-refresh
-            consecutiveRefreshFailures = 0;
+        }
+
+        function startWatchdog() {
+            // Clear any existing watchdog
+            stopWatchdog();
+            
+            // Check every minute if we've been able to load data recently
+            watchdogInterval = setInterval(() => {
+                const timeSinceLastLoad = Date.now() - lastSuccessfulDataLoad;
+                const twentyMinutes = 20 * 60 * 1000;
+                
+                if (timeSinceLastLoad > twentyMinutes) {
+                    console.error(`Watchdog: No successful data load in ${Math.floor(timeSinceLastLoad / 60000)} minutes, reloading page...`);
+                    location.reload();
+                }
+            }, 1000 * 60); // Check every minute
+        }
+
+        function stopWatchdog() {
+            if (watchdogInterval) {
+                clearInterval(watchdogInterval);
+                watchdogInterval = null;
+            }
         }
 
         function getSelectedMetrics() {
