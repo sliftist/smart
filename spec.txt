@@ -25,6 +25,8 @@ TODO: State tracking
         b) Determine how much the error increases when extrapolating future data vs the error on fitting the known data.
     5) I think we should manually adjust the heat for. Really weird patterns to create difficult data to predict. That way we can really determine if it's actually accounting for the parameters. or just kind of roughly staying the same temperature, which works because we want the temperature to stay roughly the same. So that's what our thermostat presently does. 
 
+    Provide a full view of the state parameters, PLUS current temp, and predicted time to reach target temp and predicted overshoot, predicted cycle time, etc, etc
+
 
 TODO: Variable rate humidifier
     - THEN, if it is 1 tick above the target, reduce the rate by 10%, then at 2 ticks reduce by 20%, etc.

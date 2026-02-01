@@ -53,7 +53,7 @@ let TEMPERATURE_PLAN = [
     // Warm, to wake up
     { time: 9.5, temperature: 25 },
     // Less warm, as our computer will start to get hot around this time
-    { time: 12.5, temperature: 23 },
+    { time: 12.5, temperature: 22 },
 ];
 
 

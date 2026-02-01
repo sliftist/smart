@@ -1039,9 +1039,6 @@
                 document.getElementById('labelIds').style.display = 'inline-block';
                 document.getElementById('error').style.display = 'none';
                 
-                // Update last successful data load timestamp
-                lastSuccessfulDataLoad = Date.now();
-                
                 updateURL();
                 drawChart();
             } catch (err) {
@@ -1155,17 +1152,25 @@
             
             autoRefreshInterval = setInterval(async () => {
                 if (logsDirectoryHandle && selectedStartDate && selectedEndDate) {
-                    // Refresh the list of available files to pick up new log files
-                    await loadAvailableFiles();
-                    
-                    // If live range is enabled, update the range first
-                    const liveRangeCheckbox = document.getElementById('liveRangeCheckbox');
-                    if (liveRangeCheckbox && liveRangeCheckbox.checked) {
-                        const { start, end } = setLiveRange();
-                        await loadDateRange(start, end);
-                    } else {
-                        // Otherwise just reload the current range
-                        await loadDateRange(selectedStartDate, selectedEndDate);
+                    try {
+                        // Refresh the list of available files to pick up new log files
+                        await loadAvailableFiles();
+                        
+                        // If live range is enabled, update the range first
+                        const liveRangeCheckbox = document.getElementById('liveRangeCheckbox');
+                        if (liveRangeCheckbox && liveRangeCheckbox.checked) {
+                            const { start, end } = setLiveRange();
+                            await loadDateRange(start, end);
+                        } else {
+                            // Otherwise just reload the current range
+                            await loadDateRange(selectedStartDate, selectedEndDate);
+                        }
+                        
+                        // If we got here, the load succeeded
+                        lastSuccessfulDataLoad = Date.now();
+                        console.log('Auto-refresh: Data loaded successfully');
+                    } catch (error) {
+                        console.error('Auto-refresh error:', error);
                     }
                 }
             }, 1000 * 60 * 5); // Refresh every 5 minutes
