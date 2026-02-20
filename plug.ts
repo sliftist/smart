@@ -22,9 +22,16 @@ export class Plug {
     public async getInfo(): Promise<{
         device_on: boolean;
     }> {
-        const device = await this.getDevice();
-        const info = await device.getDeviceInfo();
-        return info;
+        try {
+            const device = await this.getDevice();
+            const info = await device.getDeviceInfo();
+            return info;
+        } catch (error) {
+            console.error(`Error getting info for plug ${this.deviceMac}:`, error);
+            return {
+                device_on: false,
+            };
+        }
     }
     public async getEnergyData(): Promise<{
         today_runtime: number;
@@ -35,27 +42,49 @@ export class Plug {
         electricity_charge: number[];
         current_power: number;
     }> {
-        const device = await this.getDevice();
-        const info = await device.getEnergyUsage() as any;
-        return info;
+        try {
+            const device = await this.getDevice();
+            const info = await device.getEnergyUsage() as any;
+            return info;
+        } catch (error) {
+            console.error(`Error getting energy data for plug ${this.deviceMac}:`, error);
+            return {
+                today_runtime: 0,
+                month_runtime: 0,
+                today_energy: 0,
+                month_energy: 0,
+                local_time: new Date().toISOString(),
+                electricity_charge: [],
+                current_power: 0,
+            };
+        }
     }
     public async getOn(): Promise<boolean> {
-        const device = await this.getDevice();
-        const info = await device.getDeviceInfo();
-        return info.device_on;
+        try {
+            const device = await this.getDevice();
+            const info = await device.getDeviceInfo();
+            return info.device_on;
+        } catch (error) {
+            console.error(`Error getting plug ${this.deviceMac} on:`, error);
+            return false;
+        }
     }
     public async setOn(on: boolean): Promise<void> {
-        const device = await this.getDevice();
-        console.log(JSON.stringify({
-            id: this.deviceMac,
-            type: "plug",
-            plugOn: on,
-            time: new Date().toISOString(),
-        }));
-        if (on) {
-            await device.turnOn();
-        } else {
-            await device.turnOff();
+        try {
+            const device = await this.getDevice();
+            console.log(JSON.stringify({
+                id: this.deviceMac,
+                type: "plug",
+                plugOn: on,
+                time: new Date().toISOString(),
+            }));
+            if (on) {
+                await device.turnOn();
+            } else {
+                await device.turnOff();
+            }
+        } catch (error) {
+            console.error(`Error setting plug ${this.deviceMac} on:`, error);
         }
     }
 }
