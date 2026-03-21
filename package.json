@@ -12,7 +12,8 @@
     "log": "yarn typenode ./log.ts",
     "watch": "yarn typenode ./watch.ts",
     "sleep": "yarn typenode ./sleep.ts",
-    "toaster": "yarn typenode ./toaster.ts"
+    "toaster": "yarn typenode ./toaster.ts",
+    "toast": "yarn toaster"
   },
   "dependencies": {
     "mobx": "^6.15.0",

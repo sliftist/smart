@@ -2,6 +2,7 @@ import tsplinkconnect from "tp-link-tapo-connect";
 import { lazy } from "socket-function/src/caching";
 import * as fs from "fs";
 import * as os from "os";
+import * as childProcess from "child_process";
 
 
 
@@ -48,6 +49,21 @@ export class Plug {
             return info;
         } catch (error) {
             console.error(`Error getting energy data for plug ${this.deviceMac}:`, error);
+            try {
+                // Try a non-network, but still exec command
+                let result = await new Promise((resolve, reject) => {
+                    childProcess.exec(`ls`, (error, stdout, stderr) => {
+                        if (error) {
+                            reject(error);
+                        } else {
+                            resolve(stdout);
+                        }
+                    });
+                });
+                console.log(`ls succeeded, it's not a ioctl pipe. Probably network specific:`, result);
+            } catch (error) {
+                console.error(`Ls failed with error, issue is likely broken ioctl pipe?`, error);
+            }
             return {
                 today_runtime: 0,
                 month_runtime: 0,
