@@ -13,7 +13,9 @@
     "watch": "yarn typenode ./watch.ts",
     "sleep": "yarn typenode ./sleep.ts",
     "toaster": "yarn typenode ./toaster.ts",
-    "toast": "yarn toaster"
+    "toast": "yarn toaster",
+    "printer": "yarn typenode ./printer.ts",
+    "print": "yarn printer"
   },
   "dependencies": {
     "mobx": "^6.15.0",

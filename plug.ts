@@ -120,7 +120,7 @@ export const PlugFour = new Plug("CCBABD0592DE");
 export const PlugFive = new Plug("CCBABD059E1E");
 // toaster
 export const PlugSix = new Plug("CCBABD059D36");
-
+// printer
 export const PlugSeven = new Plug("3C7895B76C37");
 export const PlugEight = new Plug("3C7895B75EC6");
 export const PlugNine = new Plug("3C7895B75EB8");
