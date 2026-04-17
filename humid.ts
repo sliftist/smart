@@ -44,7 +44,7 @@ const OUR_THERMOSTAT_ID = "better_ecobee";
 // TODO: Maybe change this to use the observable system, so we can respond immediately? Hmm...
 const TEMPERATURE_POLL_RATE = timeInMinute * 2.5;
 
-const SUPER_COOLING_TEMPERATURE_THRESHOLD = 1.5;
+const SUPER_COOLING_TEMPERATURE_THRESHOLD = 100;
 
 // TODO: Adjust the temperature targets slightly based on outside temperatures.
 let TEMPERATURE_PLAN = [
