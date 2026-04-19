@@ -3,7 +3,7 @@ import { formatNiceDateTime, formatTime, formatVeryNiceDateTime } from "socket-f
 import { linesToObjects, objectsToObservable, watchDirectory, watchFile } from "./logWatcher";
 import { PlugFive, PlugOne } from "./plug";
 import { timeInMinute } from "socket-function/src/misc";
-import { getThermostat, setHeatingTemperatureFahrenheit } from "./ac";
+import { getThermostat, setHeatingTemperatureFahrenheit, setCoolingTemperatureFahrenheit } from "./ac";
 import { dailyCallback } from "./scheduler";
 import { runInfinitePoll, runInfinitePollCallAtStart } from "socket-function/src/batching";
 
@@ -24,6 +24,8 @@ process.on("unhandledRejection", (reason, promise) => {
 process.on("uncaughtException", (error) => {
     console.error("Uncaught exception:", error);
 });
+
+const MODE = "cooling" as "heating" | "cooling";
 
 const HUMIDITY_ID = "132";
 const HUMIDITY = 45;
@@ -241,8 +243,7 @@ async function main() {
             return thermalLimit.temperature_C;
         }
 
-        // TODO: Support cooling as well? I guess just a mode which *-1 a lot of values/comparisons
-        void runInfinitePollCallAtStart(TEMPERATURE_POLL_RATE, async () => {
+        async function heatingHandler() {
             let info = await getThermostat();
             async function setHeatingOn() {
                 let thermalLimit = getThermalLimitProbe();
@@ -251,7 +252,6 @@ async function main() {
                     await setHeatingOff();
                     return;
                 }
-                // Just set it higher than it is, to trick it to turn on. If we call this frequently enough, and the granularity is good enough, this will keep it on forever (as it will go up 50% of THERMOSTAT_FORCE_OFFSET, then we set it even higher, etc, etc)
                 let curTemp = info.properties.temperature_fahrenheit;
                 curTemp += THERMOSTAT_FORCE_OFFSET;
                 if (curTemp > 77) {
@@ -276,7 +276,6 @@ async function main() {
             let realTemperature = getRealTemperature();
             if (realTemperature === undefined) {
                 await setSuperCooling(false);
-                // NOTE: Because our method of setting the heating on or off just changes the set point, It's safest to just leave it as it is. It might be a little bit warm or a little bit hot. It might be very warm, very hot, up to 25 Celsius. Which actually will result in more like 28 Celsius (because ecobees are terrible), Or very cold, getting down to maybe 18 Celsius. However, both of these are acceptable. It's not going to cause runaway problems, such as if the humidifier is on constantly. And reasonably speaking, the temperature won't change by that much, so the set point won't change by that much by the time we notice the data is too stale and stop looking updating. 
                 return;
             }
 
@@ -300,6 +299,67 @@ async function main() {
                 } else {
                     await setSuperCooling(false);
                 }
+            }
+        }
+
+        async function coolingHandler() {
+            let info = await getThermostat();
+            async function setCoolingOn() {
+                let curTemp = info.properties.temperature_fahrenheit;
+                curTemp -= THERMOSTAT_FORCE_OFFSET;
+                if (curTemp < 60) {
+                    curTemp = 60;
+                    console.warn(`Tried to set temperature too low (${curTemp}F), limiting to 60F (15.6C)`);
+                }
+                await setCoolingTemperatureFahrenheit(curTemp);
+            }
+            async function setCoolingOff() {
+                let curTemp = info.properties.temperature_fahrenheit;
+                curTemp += THERMOSTAT_FORCE_OFFSET;
+                if (curTemp > 77) {
+                    curTemp = 77;
+                    console.warn(`Tried to set temperature too high (${curTemp}F), limiting to 77F (25C)`);
+                }
+                await setCoolingTemperatureFahrenheit(curTemp);
+            }
+            async function setSuperCooling(status: boolean) {
+                console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), super_cooling: status }));
+                await PlugFive.setOn(status);
+            }
+            let realTemperature = getRealTemperature();
+            if (realTemperature === undefined) {
+                await setSuperCooling(false);
+                return;
+            }
+
+            let targetTemperature = getCurrentTemperatureFromSets(TEMPERATURE_PLAN);
+
+            if (realTemperature === targetTemperature) {
+                console.log(`Temperature is equal to target ${realTemperature} at ${formatNiceDateTime(Date.now())}. Not touching state`);
+                await setSuperCooling(false);
+            } else if (realTemperature > targetTemperature) {
+                console.log(`Turning on cooling for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
+                await setCoolingOn();
+                await setSuperCooling(false);
+                console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, cooling_set_point_celsius: targetTemperature, is_cooling: true }));
+            } else if (realTemperature < targetTemperature) {
+                console.log(`Turning off cooling for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
+                await setCoolingOff();
+                console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, cooling_set_point_celsius: targetTemperature, is_cooling: false }));
+                if (realTemperature < targetTemperature - SUPER_COOLING_TEMPERATURE_THRESHOLD) {
+                    console.log(`Turning on super cooling for due to temperature being way too low`);
+                    await setSuperCooling(true);
+                } else {
+                    await setSuperCooling(false);
+                }
+            }
+        }
+
+        void runInfinitePollCallAtStart(TEMPERATURE_POLL_RATE, async () => {
+            if (MODE === "heating") {
+                await heatingHandler();
+            } else {
+                await coolingHandler();
             }
         });
 

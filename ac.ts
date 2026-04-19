@@ -100,6 +100,12 @@ export async function setCoolingTemperature(celsius: number) {
         cooling_set_point_celsius: celsius,
     });
 }
+export async function setCoolingTemperatureFahrenheit(fahrenheit: number) {
+    return await seamApiCall("/thermostats/cool", {
+        device_id: THERMOSTAT_ID,
+        cooling_set_point_fahrenheit: fahrenheit,
+    });
+}
 
 export async function setHeatCoolTemperatures(heatingCelsius: number, coolingCelsius: number) {
     return await seamApiCall("/thermostats/heat_cool", {
