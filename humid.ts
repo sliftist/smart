@@ -322,13 +322,8 @@ async function main() {
                 }
                 await setCoolingTemperatureFahrenheit(curTemp);
             }
-            async function setSuperCooling(status: boolean) {
-                console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), super_cooling: status }));
-                await PlugFive.setOn(status);
-            }
             let realTemperature = getRealTemperature();
             if (realTemperature === undefined) {
-                await setSuperCooling(false);
                 return;
             }
 
@@ -336,22 +331,14 @@ async function main() {
 
             if (realTemperature === targetTemperature) {
                 console.log(`Temperature is equal to target ${realTemperature} at ${formatNiceDateTime(Date.now())}. Not touching state`);
-                await setSuperCooling(false);
             } else if (realTemperature > targetTemperature) {
                 console.log(`Turning on cooling for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
                 await setCoolingOn();
-                await setSuperCooling(false);
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, cooling_set_point_celsius: targetTemperature, is_cooling: true }));
             } else if (realTemperature < targetTemperature) {
                 console.log(`Turning off cooling for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
                 await setCoolingOff();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, cooling_set_point_celsius: targetTemperature, is_cooling: false }));
-                if (realTemperature < targetTemperature - SUPER_COOLING_TEMPERATURE_THRESHOLD) {
-                    console.log(`Turning on super cooling for due to temperature being way too low`);
-                    await setSuperCooling(true);
-                } else {
-                    await setSuperCooling(false);
-                }
             }
         }
 
