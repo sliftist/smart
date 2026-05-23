@@ -15,7 +15,8 @@
     "toaster": "yarn typenode ./toaster.ts",
     "toast": "yarn toaster",
     "printer": "yarn typenode ./printer.ts",
-    "print": "yarn printer"
+    "print": "yarn printer",
+    "tooth": "yarn typenode ./tooth.ts"
   },
   "dependencies": {
     "mobx": "^6.15.0",

@@ -6,7 +6,7 @@ import * as childProcess from "child_process";
 
 
 
-const getCreds = lazy(async () => {
+export const getPlugCreds = lazy(async () => {
     let contents = await fs.promises.readFile(os.homedir() + "/tplink.json", "utf8");
     return JSON.parse(contents) as {
         email: string;
@@ -17,7 +17,7 @@ const getCreds = lazy(async () => {
 export class Plug {
     constructor(public readonly deviceMac: string) { }
     private async getDevice() {
-        let creds = await getCreds();
+        let creds = await getPlugCreds();
         return await tsplinkconnect.loginDevice(creds.email, creds.password, { deviceMac: this.deviceMac } as any);
     }
     public async getInfo(): Promise<{
