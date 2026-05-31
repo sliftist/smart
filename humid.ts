@@ -51,7 +51,7 @@ const SUPER_COOLING_TEMPERATURE_THRESHOLD = 100;
 // TODO: Adjust the temperature targets slightly based on outside temperatures.
 let TEMPERATURE_PLAN = [
     // Cold
-    { time: 0, temperature: 20.5 },
+    { time: 0, temperature: 21 },
     // Warm, to wake up
     { time: 9.5, temperature: 23 },
     // Less warm, as our computer will start to get hot around this time
