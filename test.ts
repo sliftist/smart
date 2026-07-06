@@ -11,10 +11,12 @@ async function main() {
     // let info = await getThermostat();
     // console.log(info.properties);
 
+    await PlugOne.setOn(false);
+
     // let plugInfo = await PlugOne.getInfo();
     // console.log(plugInfo);
-    let plug8 = await PlugEight.getEnergyData();
-    console.log(plug8);
+    // let plug8 = await PlugEight.getEnergyData();
+    // console.log(plug8);
     //await PlugSeven.setOn(false);
     // let energyData = await PlugTwo.getEnergyData();
     // console.log(energyData);

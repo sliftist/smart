@@ -1172,10 +1172,10 @@ to-regex-range@^5.0.1:
   dependencies:
     is-number "^7.0.0"
 
-tp-link-tapo-connect@^2.0.8:
-  version "2.0.8"
-  resolved "https://registry.yarnpkg.com/tp-link-tapo-connect/-/tp-link-tapo-connect-2.0.8.tgz#69b28d42920e2a6808cddb107b5ba8c534d838fb"
-  integrity sha512-2LcYhx/CEGWKQOMY3Cgb6s7HQ7oAzbgh7Z5BwDqm9D0R0RAa9z/H3F8eWZaBhj5wD69yrTE6b1uh0ib5G3Rv8w==
+tp-link-tapo-connect@2.0.15:
+  version "2.0.15"
+  resolved "https://registry.yarnpkg.com/tp-link-tapo-connect/-/tp-link-tapo-connect-2.0.15.tgz#bfcc86fa93f6dea1f0bbb8cdea5b97ac49698b2d"
+  integrity sha512-P0LKIi2aH6Hv9UsloNuBiniAJnKrYFyCoO4Y4ZqouasxVyoFLW0Yfg0WGYUrerARD4b3sYrvmjW/HNj9TwLWgQ==
   dependencies:
     "@network-utils/arp-lookup" "^2.1.0"
     axios "^0.21.4"
