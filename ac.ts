@@ -39,6 +39,14 @@ const seamApiCall = retryFunctional(async function seamApiCall<T = any>(path: st
     maxRetries: 300,
     minDelay: 10 * 1000,
     maxDelay: 10 * 1000,
+    // Only retry transient failures. A 4xx (bad request, e.g. a set point out of the thermostat's range) is permanent — retrying it just spins for the full retry budget spamming warnings and never succeeds. Network errors carry no HTTP status, so they fall through to retry, which is what we want for a brief internet outage.
+    shouldRetry: message => {
+        let match = message.match(/Seam API error \((\d+)\)/);
+        if (!match) return true;
+        let status = Number(match[1]);
+        if (status === 429) return true;
+        return status >= 500;
+    },
 });
 
 export async function getDevices() {

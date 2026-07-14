@@ -38,6 +38,13 @@ const THERMOSTAT_ID = "ecobee";
 const THERMOSTAT_SENSOR = "154";
 const THERMOSTAT_FORCE_OFFSET = 3;
 
+// The thermostat only accepts cooling set points within this Fahrenheit range; anything outside is rejected with a permanent 400 (cooling_set_point_out_of_range), so we must clamp before sending.
+const COOLING_SET_POINT_MIN_F = 65;
+const COOLING_SET_POINT_MAX_F = 92;
+
+// Comfort bound for how high we push the set point when forcing cooling off — well inside the hardware max.
+const COOLING_OFF_MAX_F = 77;
+
 const THERMAL_LIMIT_ID = "173";
 const THERMAL_LIMIT = 25;
 
@@ -304,18 +311,21 @@ async function main() {
             async function setCoolingOn() {
                 let curTemp = info.properties.temperature_fahrenheit;
                 curTemp -= THERMOSTAT_FORCE_OFFSET;
-                if (curTemp < 60) {
-                    curTemp = 60;
-                    console.warn(`Tried to set temperature too low (${curTemp}F), limiting to 60F (15.6C)`);
+                if (curTemp < COOLING_SET_POINT_MIN_F) {
+                    console.warn(`Tried to set cooling set point too low (${curTemp}F), limiting to ${COOLING_SET_POINT_MIN_F}F`);
+                    curTemp = COOLING_SET_POINT_MIN_F;
                 }
                 await setCoolingTemperatureFahrenheit(curTemp);
             }
             async function setCoolingOff() {
                 let curTemp = info.properties.temperature_fahrenheit;
                 curTemp += THERMOSTAT_FORCE_OFFSET;
-                if (curTemp > 77) {
-                    curTemp = 77;
-                    console.warn(`Tried to set temperature too high (${curTemp}F), limiting to 77F (25C)`);
+                if (curTemp > COOLING_OFF_MAX_F) {
+                    console.warn(`Tried to set cooling set point too high (${curTemp}F), limiting to ${COOLING_OFF_MAX_F}F`);
+                    curTemp = COOLING_OFF_MAX_F;
+                }
+                if (curTemp > COOLING_SET_POINT_MAX_F) {
+                    curTemp = COOLING_SET_POINT_MAX_F;
                 }
                 await setCoolingTemperatureFahrenheit(curTemp);
             }
