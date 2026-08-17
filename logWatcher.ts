@@ -98,7 +98,7 @@ export function watchDirectory(dirPath: string): AsyncIterable<string> {
         for (const file of existingFiles) {
             const fullPath = path.join(dirPath, file);
             const stat = await fsPromises.stat(fullPath);
-            if (stat.isFile() && isFileWithinLastWeek(file)) {
+            if (stat.isFile() && !seenFiles.has(file) && isFileWithinLastWeek(file)) {
                 seenFiles.add(file);
                 push(fullPath);
             }
@@ -113,63 +113,71 @@ export function watchFile(filePath: string): AsyncIterable<string> {
     const { iterable, push, close } = createAsyncIterable<string>();
     let lastSize = 0;
     let buffer = "";
+    // fs.watch fires change events faster than we can read, and the old re-entrant handler let concurrent reads corrupt lastSize/buffer (overlapping byte ranges spliced mid-line, e.g. producing year-20226 timestamps). All reads must go through this single non-re-entrant drain.
+    let draining = false;
+    let pendingChange = false;
 
-    // Initialize by reading existing content and setting up watcher
-    void (async () => {
-        // First, read all existing content
-        try {
-            const data = await fsPromises.readFile(filePath, "utf8");
-            lastSize = Buffer.byteLength(data, "utf8");
-            const lines = data.split("\n");
-            // Keep the last incomplete line in the buffer
-            buffer = lines.pop() || "";
-            for (const line of lines) {
-                push(line);
-            }
-        } catch (err) {
-            // File doesn't exist yet, start with size 0
-            lastSize = 0;
+    async function drain(): Promise<void> {
+        if (draining) {
+            pendingChange = true;
+            return;
         }
-
-        // Then watch for changes
-        const watcher = fs.watch(filePath, { persistent: false });
-
-        watcher.on("change", async (eventType) => {
-            if (eventType === "change") {
-                try {
+        draining = true;
+        try {
+            do {
+                pendingChange = false;
+                while (true) {
                     const stat = await fsPromises.stat(filePath);
-                    const newSize = stat.size;
-
-                    // Only read if file has grown
-                    if (newSize > lastSize) {
-                        const bytesToRead = newSize - lastSize;
-                        const fd = await fsPromises.open(filePath, "r");
+                    if (stat.size <= lastSize) break;
+                    const bytesToRead = stat.size - lastSize;
+                    const fd = await fsPromises.open(filePath, "r");
+                    let bytesRead = 0;
+                    try {
                         const readBuffer = Buffer.allocUnsafe(bytesToRead);
-                        await fd.read(readBuffer, 0, bytesToRead, lastSize);
-                        await fd.close();
-
-                        lastSize = newSize;
-
-                        // Combine with any incomplete line from before
-                        const newData = buffer + readBuffer.toString("utf8");
-                        const lines = newData.split("\n");
-                        // Keep the last incomplete line in the buffer
-                        buffer = lines.pop() || "";
-
-                        // Push all complete lines
-                        for (const line of lines) {
-                            push(line);
+                        const result = await fd.read(readBuffer, 0, bytesToRead, lastSize);
+                        bytesRead = result.bytesRead;
+                        if (bytesRead > 0) {
+                            lastSize += bytesRead;
+                            const newData = buffer + readBuffer.toString("utf8", 0, bytesRead);
+                            const lines = newData.split("\n");
+                            // Keep the last incomplete line in the buffer
+                            buffer = lines.pop() || "";
+                            for (const line of lines) {
+                                push(line);
+                            }
                         }
+                    } finally {
+                        await fd.close();
                     }
-                } catch (err) {
-                    // File might have been deleted or is being written to, ignore for now
+                    if (bytesRead <= 0) break;
                 }
-            }
-        });
+            } while (pendingChange);
+        } catch (err) {
+            // File might have been deleted or is being written to; the next change event retries
+        } finally {
+            draining = false;
+        }
+    }
+
+    void (async () => {
+        try {
+            const watcher = fs.watch(filePath, { persistent: false });
+            watcher.on("change", (eventType) => {
+                if (eventType === "change") {
+                    void drain();
+                }
+            });
+        } catch (err) {
+            console.error(`[LogWatcher] Failed to watch ${filePath}:`, (err as Error).stack ?? err);
+        }
+        // Initial content goes through the same drain as change events, so there is no separate read path to race against
+        await drain();
     })();
 
     return iterable;
 }
+const MAX_FUTURE_TIMESTAMP_SKEW_MS = 5 * 60 * 1000;
+
 type ObjectUnknown = Record<string, unknown>;
 // Ignores lines that can't be JSON parsed. 
 export function linesToObjects(lines: AsyncIterable<string>): AsyncIterable<ObjectUnknown> {
@@ -207,6 +215,16 @@ export function objectsToObservable(
             const key = getKey(obj);
             if (typeof key === "string" || typeof key === "number") {
                 const time = getTime(obj);
+                if (!Number.isFinite(time)) {
+                    console.warn(`[objectsToObservable] Rejecting unparseable timestamp for key ${key}: raw time value ${time}, object ${JSON.stringify(obj)}`);
+                    continue;
+                }
+                // A corrupted line with a far-future timestamp would win "newest wins" forever, freezing the key on garbage until restart — so implausible futures are rejected before they can be stored.
+                const now = Date.now();
+                if (time > now + MAX_FUTURE_TIMESTAMP_SKEW_MS) {
+                    console.warn(`[objectsToObservable] Rejecting far-future timestamp for key ${key}: object time ${new Date(time).toISOString()}, now ${new Date(now).toISOString()}, object ${JSON.stringify(obj)}`);
+                    continue;
+                }
                 let prev = observable[key];
                 if (prev && getTime(prev) > time) {
                     continue;

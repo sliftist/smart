@@ -331,7 +331,9 @@ async function main() {
             }
             let realTemperature = getRealTemperature();
             if (realTemperature === undefined) {
-                return;
+                // Silently returning here leaves whatever set point was last written frozen indefinitely, so a dead sensor must not mean "do nothing" — the ecobee's own reading keeps the control loop alive, if less accurately placed.
+                realTemperature = info.properties.temperature_celsius;
+                console.warn(`No usable sensor data for ${THERMOSTAT_SENSOR}, falling back to the ecobee's own reading of ${realTemperature}C at ${formatNiceDateTime(Date.now())}`);
             }
 
             let targetTemperature = getCurrentTemperatureFromSets(TEMPERATURE_PLAN);
