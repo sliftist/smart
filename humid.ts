@@ -26,7 +26,7 @@ process.on("uncaughtException", (error) => {
     console.error("Uncaught exception:", error);
 });
 
-const MODE = "heating" as "heating" | "cooling";
+const BUILDING_MODE = "heating" as "heating" | "cooling";
 
 const HUMIDITY_ID = "132";
 const HUMIDITY = 45;
@@ -107,9 +107,9 @@ let controlState: {
     targetTemperature?: number;
     controlTemperature?: number;
     controlTemperatureSource?: string;
-    action?: string;
-    actionReason?: string;
-    actionTime?: number;
+    hvacOn?: boolean;
+    hvacReason?: string;
+    hvacTime?: number;
     setPointKind?: "heating" | "cooling";
     setPoint?: number;
     setPointTime?: number;
@@ -133,7 +133,7 @@ function getSensorStatus(id: string, role: string) {
 
 function buildStatus() {
     return {
-        mode: MODE,
+        buildingMode: BUILDING_MODE,
         maxDataAge: MAX_DATA_AGE,
         humidityTarget: HUMIDITY,
         thermalLimit: THERMAL_LIMIT,
@@ -358,10 +358,12 @@ async function main() {
             return outside.temperature_C;
         }
 
-        function recordAction(action: string, reason: string) {
-            controlState.action = action;
-            controlState.actionReason = reason;
-            controlState.actionTime = Date.now();
+        function recordHvac(on: boolean | undefined, reason: string) {
+            if (on !== undefined) {
+                controlState.hvacOn = on;
+            }
+            controlState.hvacReason = reason;
+            controlState.hvacTime = Date.now();
         }
         function recordSetPoint(kind: "heating" | "cooling", setPoint: number) {
             controlState.setPointKind = kind;
@@ -380,7 +382,7 @@ async function main() {
                 let thermalLimit = getThermalLimitProbe();
                 if (thermalLimit !== undefined && thermalLimit >= THERMAL_LIMIT) {
                     console.log(`Thermal limit hit ${thermalLimit} >= ${THERMAL_LIMIT} at ${formatNiceDateTime(Date.now())}. Ignoring heating request, and ensuring heat is off`);
-                    recordAction("heating off", `Thermal limit ${thermalLimit} >= ${THERMAL_LIMIT}`);
+                    recordHvac(false, `Thermal limit ${thermalLimit} >= ${THERMAL_LIMIT}`);
                     await setHeatingOff();
                     return;
                 }
@@ -411,7 +413,7 @@ async function main() {
             }
             let realTemperature = getRealTemperature();
             if (realTemperature === undefined) {
-                recordAction("none", `No usable room temperature from ${THERMOSTAT_SENSOR}`);
+                recordHvac(undefined, `No usable room temperature from ${THERMOSTAT_SENSOR}`);
                 await setSuperCooling(false, `No usable room temperature from ${THERMOSTAT_SENSOR}`);
                 return;
             }
@@ -421,17 +423,17 @@ async function main() {
 
             if (realTemperature === targetTemperature) {
                 console.log(`Temperature is equal to target ${realTemperature} at ${formatNiceDateTime(Date.now())}. Not touching state`);
-                recordAction("none", `Room ${realTemperature} == target ${targetTemperature}`);
+                recordHvac(undefined, `Room ${realTemperature} == target ${targetTemperature}, leaving as is`);
                 await setSuperCooling(false, `Room ${realTemperature} == target ${targetTemperature}`);
             } else if (realTemperature < targetTemperature) {
                 console.log(`Turning on heating for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
-                recordAction("heating on", `Room ${realTemperature} < target ${targetTemperature}`);
+                recordHvac(true,`Room ${realTemperature} < target ${targetTemperature}`);
                 await setHeatingOn();
                 await setSuperCooling(false, `Room ${realTemperature} < target ${targetTemperature}`);
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celsius: targetTemperature, is_heating: true }));
             } else if (realTemperature > targetTemperature) {
                 console.log(`Turning off heating for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
-                recordAction("heating off", `Room ${realTemperature} > target ${targetTemperature}`);
+                recordHvac(false,`Room ${realTemperature} > target ${targetTemperature}`);
                 await setHeatingOff();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celsius: targetTemperature, is_heating: false }));
                 if (realTemperature > targetTemperature + SUPER_COOLING_TEMPERATURE_THRESHOLD) {
@@ -491,22 +493,22 @@ async function main() {
 
             if (realTemperature === targetTemperature) {
                 console.log(`Temperature is equal to target ${realTemperature} at ${formatNiceDateTime(Date.now())}. Not touching state`);
-                recordAction("none", `Room ${realTemperature} == target ${targetTemperature}`);
+                recordHvac(undefined, `Room ${realTemperature} == target ${targetTemperature}, leaving as is`);
             } else if (realTemperature > targetTemperature) {
                 console.log(`Turning on cooling for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
-                recordAction("cooling on", `Room ${realTemperature} > target ${targetTemperature}`);
+                recordHvac(true,`Room ${realTemperature} > target ${targetTemperature}`);
                 await setCoolingOn();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, cooling_set_point_celsius: targetTemperature, is_cooling: true }));
             } else if (realTemperature < targetTemperature) {
                 console.log(`Turning off cooling for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
-                recordAction("cooling off", `Room ${realTemperature} < target ${targetTemperature}`);
+                recordHvac(false,`Room ${realTemperature} < target ${targetTemperature}`);
                 await setCoolingOff();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, cooling_set_point_celsius: targetTemperature, is_cooling: false }));
             }
         }
 
         void runInfinitePollCallAtStart(TEMPERATURE_POLL_RATE, async () => {
-            if (MODE === "heating") {
+            if (BUILDING_MODE === "heating") {
                 await heatingHandler();
             } else {
                 await coolingHandler();

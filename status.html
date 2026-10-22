@@ -45,6 +45,10 @@
         color: var(--muted);
         margin: 0 0 10px;
     }
+    #building {
+        font-size: 15px;
+        margin-bottom: 4px;
+    }
     #connection {
         color: var(--muted);
         font-size: 13px;
@@ -65,9 +69,10 @@
         border-radius: 10px;
         padding: 14px 16px;
     }
-    .big {
+    .state {
         font-size: 34px;
-        font-variant-numeric: tabular-nums;
+        font-weight: 700;
+        margin: 2px 0 8px;
     }
     .row {
         display: flex;
@@ -77,34 +82,43 @@
         border-top: 1px solid var(--border);
         font-variant-numeric: tabular-nums;
     }
-    .row:first-of-type {
-        border-top: none;
-    }
     .label {
         color: var(--muted);
     }
     .reason {
         color: var(--muted);
         font-size: 13px;
-        margin-top: 6px;
+        margin: 6px 0;
     }
     .on {
         color: var(--on);
-        font-weight: 600;
     }
     .off {
         color: var(--off);
-        font-weight: 600;
     }
     .stale {
         color: var(--warn);
+    }
+    details {
+        max-width: 1100px;
+        margin-top: 16px;
+    }
+    summary {
+        cursor: pointer;
+        color: var(--muted);
+        margin-bottom: 10px;
     }
 </style>
 </head>
 <body>
 <h1>Climate Status</h1>
+<div id="building"></div>
 <div id="connection">Connecting...</div>
 <div class="grid" id="content"></div>
+<details>
+    <summary>Details</summary>
+    <div class="grid" id="details"></div>
+</details>
 <script>
 const DEFAULT_HOST = "10.0.0.119";
 const PORT = 8090;
@@ -133,11 +147,20 @@ function formatAge(time) {
     return `${Math.floor(minutes / 60)}h ${minutes % 60}m ago`;
 }
 function onOff(value) {
-    if (value === undefined) return `<span class="off">unknown</span>`;
+    if (value === undefined) return `<span class="off">UNKNOWN</span>`;
     return value ? `<span class="on">ON</span>` : `<span class="off">OFF</span>`;
 }
 function row(label, value) {
     return `<div class="row"><span class="label">${escapeHtml(label)}</span><span>${value}</span></div>`;
+}
+function sensorRow(label, sensor) {
+    if (!sensor) return row(label, "—");
+    let stale = !sensor.time || Date.now() - sensor.time > status.maxDataAge;
+    let humidity = typeof sensor.humidity === "number" ? ` · ${sensor.humidity}%` : "";
+    return row(`${label} (#${sensor.id})`, `${formatTemp(sensor.temperature_C)}${humidity} <span class="${stale ? "stale" : "label"}">${formatAge(sensor.time)}</span>`);
+}
+function card(title, body) {
+    return `<div class="card"><h2>${escapeHtml(title)}</h2>${body}</div>`;
 }
 
 function render() {
@@ -148,61 +171,58 @@ function render() {
     let control = status.control || {};
     let thermostat = control.thermostat;
     let setting = thermostat && thermostat.current_climate_setting;
+    let sensor = role => status.sensors.find(s => s.role === role);
+    let inside = sensor("room (control)");
+    let outside = sensor("outside");
+    let humiditySensor = sensor("humidity");
+    let heating = status.buildingMode === "heating";
+
+    document.getElementById("building").innerHTML = `Building is <b>${escapeHtml(status.buildingMode)}</b> <span class="label">(set by the building, not us)</span>`;
+
     let cards = [];
-
-    cards.push(`<div class="card">
-        <h2>Goal (${escapeHtml(status.mode)} mode)</h2>
-        <div class="big">${formatTemp(control.controlTemperature)} → ${formatTemp(control.targetTemperature)}</div>
-        <div class="reason">Room reading from ${escapeHtml(control.controlTemperatureSource || "—")}</div>
-        ${row("Action", escapeHtml(control.action || "—"))}
-        ${row("Decided", formatAge(control.actionTime))}
-        <div class="reason">${escapeHtml(control.actionReason || "")}</div>
-    </div>`);
-
-    cards.push(`<div class="card">
-        <h2>What we set</h2>
-        ${row(`Last ${control.setPointKind || ""} set point sent`, formatTemp(control.setPoint))}
-        ${row("Sent", formatAge(control.setPointTime))}
-        ${row("Super cooling (outside fan)", onOff(control.superCooling))}
-        <div class="reason">${escapeHtml(control.superCoolingReason || "")}</div>
-        ${row("Humidifier", onOff(control.humidifierOn))}
+    cards.push(card(heating ? "Heating" : "Cooling", `
+        <div class="state">${onOff(control.hvacOn)}</div>
+        ${sensorRow("Inside", inside)}
+        ${row("Target", formatTemp(control.targetTemperature))}
+        <div class="reason">${escapeHtml(control.hvacReason || "")} · ${formatAge(control.hvacTime)}</div>
+    `));
+    cards.push(card("Super cooling (window fan)", `
+        <div class="state">${onOff(heating ? control.superCooling : false)}</div>
+        ${sensorRow("Outside", outside)}
+        ${row("Needs inside above target by", formatTemp(status.superCoolingTemperatureThreshold))}
+        ${row("Needs outside below target by", formatTemp(status.superCoolingOutsideThreshold))}
+        <div class="reason">${heating ? escapeHtml(control.superCoolingReason || "") : "Only used while the building is heating"}</div>
+    `));
+    cards.push(card("Humidifier", `
+        <div class="state">${onOff(control.humidifierOn)}</div>
+        ${row(`Humidity (#${humiditySensor ? humiditySensor.id : "?"})`, typeof (humiditySensor && humiditySensor.humidity) === "number" ? `${humiditySensor.humidity}% <span class="${Date.now() - humiditySensor.time > status.maxDataAge ? "stale" : "label"}">${formatAge(humiditySensor.time)}</span>` : "—")}
+        ${row("Target", `${status.humidityTarget}%`)}
         <div class="reason">${escapeHtml(control.humidifierReason || "")}</div>
-    </div>`);
-
-    cards.push(`<div class="card">
-        <h2>Sensors</h2>
-        ${status.sensors.map(sensor => {
-            let stale = !sensor.time || Date.now() - sensor.time > status.maxDataAge;
-            let humidity = typeof sensor.humidity === "number" ? ` · ${sensor.humidity}%` : "";
-            return row(`${sensor.role} (#${sensor.id})`, `${formatTemp(sensor.temperature_C)}${humidity} <span class="${stale ? "stale" : "label"}">${formatAge(sensor.time)}</span>`);
-        }).join("")}
-    </div>`);
-
-    cards.push(`<div class="card">
-        <h2>Ecobee</h2>
-        ${thermostat ? `
-            ${row("Reading", formatTemp(thermostat.temperature_celsius))}
-            ${row("HVAC mode", escapeHtml(setting.hvac_mode_setting))}
-            ${row("Fan mode", escapeHtml(setting.fan_mode_setting))}
-            ${row("Heating set point", formatTemp(setting.heating_set_point_celsius))}
-            ${row("Cooling set point", formatTemp(setting.cooling_set_point_celsius))}
-            ${row("Heating", onOff(thermostat.is_heating))}
-            ${row("Cooling", onOff(thermostat.is_cooling))}
-            ${row("Fan running", onOff(thermostat.is_fan_running))}
-            ${row("Polled", formatAge(control.thermostatTime))}
-        ` : `<div class="reason">No thermostat data yet</div>`}
-    </div>`);
-
-    cards.push(`<div class="card">
-        <h2>Config</h2>
-        ${row("Humidity target", `${status.humidityTarget}%`)}
-        ${row("Thermal limit", formatTemp(status.thermalLimit))}
-        ${row("Super cool when room above target by", formatTemp(status.superCoolingTemperatureThreshold))}
-        ${row("Only if outside below target by", formatTemp(status.superCoolingOutsideThreshold))}
-        ${status.temperaturePlan.map(set => row(`Plan from ${set.time}h`, formatTemp(set.temperature))).join("")}
-    </div>`);
-
+    `));
     document.getElementById("content").innerHTML = cards.join("");
+
+    let details = [];
+    details.push(card("Ecobee", thermostat ? `
+        ${row("Reading", formatTemp(thermostat.temperature_celsius))}
+        ${row("HVAC mode", escapeHtml(setting.hvac_mode_setting))}
+        ${row("Heating set point", formatTemp(setting.heating_set_point_celsius))}
+        ${row("Cooling set point", formatTemp(setting.cooling_set_point_celsius))}
+        ${row("Heating", onOff(thermostat.is_heating))}
+        ${row("Cooling", onOff(thermostat.is_cooling))}
+        ${row("Fan running", onOff(thermostat.is_fan_running))}
+        ${row("Polled", formatAge(control.thermostatTime))}
+    ` : `<div class="reason">No thermostat data yet</div>`));
+    details.push(card("What we sent", `
+        ${row(`Last ${control.setPointKind || ""} set point`, formatTemp(control.setPoint))}
+        ${row("Sent", formatAge(control.setPointTime))}
+        ${row("Inside reading used from", escapeHtml(control.controlTemperatureSource || "—"))}
+    `));
+    details.push(card("Other sensors & config", `
+        ${sensorRow("Thermal limit", sensor("thermal limit"))}
+        ${row("Thermal limit", formatTemp(status.thermalLimit))}
+        ${status.temperaturePlan.map(set => row(`Plan from ${set.time}h`, formatTemp(set.temperature))).join("")}
+    `));
+    document.getElementById("details").innerHTML = details.join("");
 }
 
 function connect() {
