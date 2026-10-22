@@ -324,38 +324,25 @@ async function main() {
             return sets[0].temperature;
         }
 
-        function getRealTemperature(): number | undefined {
-            let temperature = allData[THERMOSTAT_SENSOR];
-            if (!temperature) return undefined;
-            if (!("temperature_C" in temperature)) return undefined;
-            let timeOff = Math.abs(new Date(temperature.time).getTime() - Date.now());
-            if (timeOff > MAX_DATA_AGE) {
-                console.warn(`Temperature data is too old for ${THERMOSTAT_SENSOR}. Now is ${formatNiceDateTime(Date.now())}, and the temperature was at ${formatNiceDateTime(+new Date(temperature.time))}, so it is ${formatTime(timeOff)} off`);
-                return undefined;
+        function readSensorTemperature(id: string, label: string): { temperature: number } | { error: string } {
+            let datum = allData[id];
+            if (!datum) {
+                return { error: `No reading from ${label} sensor ${id} since startup` };
             }
-            return temperature.temperature_C;
+            if (!("temperature_C" in datum)) {
+                return { error: `Last message from ${label} sensor ${id} at ${formatNiceDateTime(+new Date(datum.time))} has no temperature_C` };
+            }
+            let timeOff = Math.abs(new Date(datum.time).getTime() - Date.now());
+            if (timeOff > MAX_DATA_AGE) {
+                let error = `Last reading from ${label} sensor ${id} was at ${formatNiceDateTime(+new Date(datum.time))}, ${formatTime(timeOff)} ago, older than the max of ${formatTime(MAX_DATA_AGE)}`;
+                console.warn(`${error}. Now is ${formatNiceDateTime(Date.now())}`);
+                return { error };
+            }
+            return { temperature: datum.temperature_C };
         }
         function getThermalLimitProbe(): number | undefined {
-            let thermalLimit = allData[THERMAL_LIMIT_ID];
-            if (!thermalLimit) return undefined;
-            if (!("temperature_C" in thermalLimit)) return undefined;
-            let timeOff = Math.abs(new Date(thermalLimit.time).getTime() - Date.now());
-            if (timeOff > MAX_DATA_AGE) {
-                console.warn(`Thermal limit data is too old for ${THERMAL_LIMIT_ID}. Now is ${formatNiceDateTime(Date.now())}, and the thermal limit was at ${formatNiceDateTime(+new Date(thermalLimit.time))}, so it is ${formatTime(timeOff)} off`);
-                return undefined;
-            }
-            return thermalLimit.temperature_C;
-        }
-        function getOutsideTemperature(): number | undefined {
-            let outside = allData[OUTSIDE_SENSOR];
-            if (!outside) return undefined;
-            if (!("temperature_C" in outside)) return undefined;
-            let timeOff = Math.abs(new Date(outside.time).getTime() - Date.now());
-            if (timeOff > MAX_DATA_AGE) {
-                console.warn(`Outside temperature data is too old for ${OUTSIDE_SENSOR}. Now is ${formatNiceDateTime(Date.now())}, and the outside temperature was at ${formatNiceDateTime(+new Date(outside.time))}, so it is ${formatTime(timeOff)} off`);
-                return undefined;
-            }
-            return outside.temperature_C;
+            let reading = readSensorTemperature(THERMAL_LIMIT_ID, "thermal limit");
+            return "temperature" in reading ? reading.temperature : undefined;
         }
 
         function recordHvac(on: boolean | undefined, reason: string) {
@@ -411,12 +398,13 @@ async function main() {
                 controlState.superCooling = status;
                 controlState.superCoolingReason = reason;
             }
-            let realTemperature = getRealTemperature();
-            if (realTemperature === undefined) {
-                recordHvac(undefined, `No usable room temperature from ${THERMOSTAT_SENSOR}`);
-                await setSuperCooling(false, `No usable room temperature from ${THERMOSTAT_SENSOR}`);
+            let roomReading = readSensorTemperature(THERMOSTAT_SENSOR, "room");
+            if ("error" in roomReading) {
+                recordHvac(undefined, roomReading.error);
+                await setSuperCooling(false, roomReading.error);
                 return;
             }
+            let realTemperature = roomReading.temperature;
 
             let targetTemperature = getCurrentTemperatureFromSets(TEMPERATURE_PLAN);
             recordControlTemperature(realTemperature, THERMOSTAT_SENSOR, targetTemperature);
@@ -437,11 +425,14 @@ async function main() {
                 await setHeatingOff();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celsius: targetTemperature, is_heating: false }));
                 if (realTemperature > targetTemperature + SUPER_COOLING_TEMPERATURE_THRESHOLD) {
-                    let outsideTemperature = getOutsideTemperature();
-                    if (outsideTemperature === undefined) {
-                        console.warn(`Not super cooling despite temperature ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, because there is no usable outside temperature from ${OUTSIDE_SENSOR} at ${formatNiceDateTime(Date.now())}`);
-                        await setSuperCooling(false, `Room ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, but no usable outside temperature from ${OUTSIDE_SENSOR}`);
-                    } else if (outsideTemperature > targetTemperature - SUPER_COOLING_OUTSIDE_THRESHOLD) {
+                    let outsideReading = readSensorTemperature(OUTSIDE_SENSOR, "outside");
+                    if ("error" in outsideReading) {
+                        console.warn(`Not super cooling despite temperature ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, because: ${outsideReading.error}, at ${formatNiceDateTime(Date.now())}`);
+                        await setSuperCooling(false, `Room ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, but: ${outsideReading.error}`);
+                        return;
+                    }
+                    let outsideTemperature = outsideReading.temperature;
+                    if (outsideTemperature > targetTemperature - SUPER_COOLING_OUTSIDE_THRESHOLD) {
                         console.log(`Not super cooling despite temperature ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, because outside ${outsideTemperature} > ${targetTemperature} - ${SUPER_COOLING_OUTSIDE_THRESHOLD} at ${formatNiceDateTime(Date.now())}`);
                         await setSuperCooling(false, `Room ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, but outside ${outsideTemperature} > ${targetTemperature} - ${SUPER_COOLING_OUTSIDE_THRESHOLD}`);
                     } else {
@@ -479,13 +470,16 @@ async function main() {
                 await setCoolingTemperature(curTemp);
                 recordSetPoint("cooling", curTemp);
             }
-            let realTemperature = getRealTemperature();
+            let roomReading = readSensorTemperature(THERMOSTAT_SENSOR, "room");
+            let realTemperature: number;
             let temperatureSource = THERMOSTAT_SENSOR;
-            if (realTemperature === undefined) {
+            if ("error" in roomReading) {
                 // Silently returning here leaves whatever set point was last written frozen indefinitely, so a dead sensor must not mean "do nothing" — the ecobee's own reading keeps the control loop alive, if less accurately placed.
                 realTemperature = info.properties.temperature_celsius;
                 temperatureSource = THERMOSTAT_ID;
-                console.warn(`No usable sensor data for ${THERMOSTAT_SENSOR}, falling back to the ecobee's own reading of ${realTemperature}C at ${formatNiceDateTime(Date.now())}`);
+                console.warn(`${roomReading.error}, falling back to the ecobee's own reading of ${realTemperature}C at ${formatNiceDateTime(Date.now())}`);
+            } else {
+                realTemperature = roomReading.temperature;
             }
 
             let targetTemperature = getCurrentTemperatureFromSets(TEMPERATURE_PLAN);
