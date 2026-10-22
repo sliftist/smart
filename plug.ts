@@ -116,13 +116,13 @@ export const PlugTwo = new Plug("8C902DF80E35");
 export const PlugThree = new Plug("CCBABD05A2E2");
 // uv cleaner reservoir
 export const PlugFour = new Plug("CCBABD0592DE");
-// outside fan
 export const PlugFive = new Plug("CCBABD059E1E");
 // toaster
 export const PlugSix = new Plug("CCBABD059D36");
 // printer
 export const PlugSeven = new Plug("3C7895B76C37");
 export const PlugEight = new Plug("3C7895B75EC6");
+// outside fan
 export const PlugNine = new Plug("3C7895B75EB8");
 export const PlugTen = new Plug("3C7895B76D82");
 export const PlugEleven = new Plug("3C7895B76C33");

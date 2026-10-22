@@ -1,11 +1,12 @@
 import { configure, autorun, observable } from "mobx";
 import { formatNiceDateTime, formatTime, formatVeryNiceDateTime } from "socket-function/src/formatting/format";
 import { linesToObjects, objectsToObservable, watchDirectory, watchFile } from "./logWatcher";
-import { PlugFive, PlugOne } from "./plug";
+import { PlugNine, PlugOne } from "./plug";
 import { timeInMinute } from "socket-function/src/misc";
 import { getThermostat, setHeatingTemperature, setCoolingTemperature } from "./ac";
 import { dailyCallback } from "./scheduler";
 import { runInfinitePoll, runInfinitePollCallAtStart } from "socket-function/src/batching";
+import { WebSocketServer, WebSocket } from "ws";
 
 /*
 24 outside
@@ -55,7 +56,10 @@ const OUR_THERMOSTAT_ID = "better_ecobee";
 // TODO: Maybe change this to use the observable system, so we can respond immediately? Hmm...
 const TEMPERATURE_POLL_RATE = timeInMinute * 2.5;
 
-const SUPER_COOLING_TEMPERATURE_THRESHOLD = 100;
+const SUPER_COOLING_PLUG = PlugNine;
+const SUPER_COOLING_TEMPERATURE_THRESHOLD = 3;
+const OUTSIDE_SENSOR = "24";
+const SUPER_COOLING_OUTSIDE_THRESHOLD = 3;
 
 // TODO: Adjust the temperature targets slightly based on outside temperatures.
 let TEMPERATURE_PLAN = [
@@ -90,7 +94,96 @@ let allData = observable({
 
 } as Record<string, Datum>);
 
+const STATUS_PORT = 8090;
+const STATUS_BROADCAST_INTERVAL = 2000;
+
+type ThermostatInfo = Awaited<ReturnType<typeof getThermostat>>;
+
+let controlState: {
+    humidifierOn?: boolean;
+    humidifierReason?: string;
+    thermostat?: ThermostatInfo["properties"];
+    thermostatTime?: number;
+    targetTemperature?: number;
+    controlTemperature?: number;
+    controlTemperatureSource?: string;
+    action?: string;
+    actionReason?: string;
+    actionTime?: number;
+    setPointKind?: "heating" | "cooling";
+    setPoint?: number;
+    setPointTime?: number;
+    superCooling?: boolean;
+    superCoolingReason?: string;
+} = {};
+
+function getSensorStatus(id: string, role: string) {
+    let datum = allData[id];
+    if (!datum || !("temperature_C" in datum)) {
+        return { id, role };
+    }
+    return {
+        id,
+        role,
+        temperature_C: datum.temperature_C,
+        humidity: datum.humidity,
+        time: +new Date(datum.time),
+    };
+}
+
+function buildStatus() {
+    return {
+        mode: MODE,
+        maxDataAge: MAX_DATA_AGE,
+        humidityTarget: HUMIDITY,
+        thermalLimit: THERMAL_LIMIT,
+        superCoolingTemperatureThreshold: SUPER_COOLING_TEMPERATURE_THRESHOLD,
+        superCoolingOutsideThreshold: SUPER_COOLING_OUTSIDE_THRESHOLD,
+        temperaturePlan: TEMPERATURE_PLAN,
+        sensors: [
+            getSensorStatus(THERMOSTAT_SENSOR, "room (control)"),
+            getSensorStatus(OUTSIDE_SENSOR, "outside"),
+            getSensorStatus(THERMAL_LIMIT_ID, "thermal limit"),
+            getSensorStatus(HUMIDITY_ID, "humidity"),
+        ],
+        control: controlState,
+    };
+}
+
+function startStatusServer() {
+    let server = new WebSocketServer({ host: "0.0.0.0", port: STATUS_PORT });
+    server.on("listening", () => {
+        console.log(`[pid ${process.pid}] Status WebSocket server listening on ws://0.0.0.0:${STATUS_PORT} at ${formatNiceDateTime(Date.now())}`);
+    });
+    server.on("error", (error) => {
+        console.error(`[pid ${process.pid}] Status WebSocket server error on port ${STATUS_PORT}:`, error.stack ?? error);
+    });
+    server.on("connection", (socket, request) => {
+        let remote = `${request.socket.remoteAddress}:${request.socket.remotePort}`;
+        console.log(`[pid ${process.pid}] Status client connected from ${remote} at ${formatNiceDateTime(Date.now())}, ${server.clients.size} clients connected`);
+        socket.send(JSON.stringify(buildStatus()));
+        socket.on("close", () => {
+            console.log(`[pid ${process.pid}] Status client disconnected from ${remote} at ${formatNiceDateTime(Date.now())}, ${server.clients.size} clients connected`);
+        });
+        socket.on("error", (error) => {
+            console.error(`[pid ${process.pid}] Status client error from ${remote}:`, error.stack ?? error);
+        });
+    });
+    let lastSent = "";
+    setInterval(() => {
+        let message = JSON.stringify(buildStatus());
+        if (message === lastSent) return;
+        lastSent = message;
+        for (let client of server.clients) {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+            }
+        }
+    }, STATUS_BROADCAST_INTERVAL);
+}
+
 async function main() {
+    startStatusServer();
     function iterateForked<T>(iterable: AsyncIterable<T>, handler: (item: T) => void) {
         void (async () => {
             for await (const item of iterable) {
@@ -124,9 +217,12 @@ async function main() {
         return undefined;
     }
     let isPlugOn = await PLUG.getOn();
+    controlState.humidifierOn = isPlugOn;
     let paused = observable({ value: false });
-    function changePlugState(on: boolean) {
+    function changePlugState(on: boolean, reason: string) {
         isPlugOn = on;
+        controlState.humidifierOn = on;
+        controlState.humidifierReason = reason;
         paused.value = true;
         if (on) {
             void PLUG.setOn(true);
@@ -152,17 +248,17 @@ async function main() {
             console.log(`No humidity data at ${formatNiceDateTime(Date.now())}`);
             if (humidityCountdown.value > MAX_TIME_NO_DATA && isPlugOn) {
                 console.log(`No humidity data too long (${formatTime(humidityCountdown.value)}), turning off the plug`);
-                changePlugState(false);
+                changePlugState(false, `No humidity data for ${formatTime(humidityCountdown.value)}`);
             }
             return;
         }
         humidityCountdown.value = 0;
         if (humidity <= HUMIDITY) {
             console.log(`Turning on humidifier for #${HUMIDITY_ID} due to humidity being too low ${humidity} <= ${HUMIDITY} at ${formatNiceDateTime(Date.now())}`);
-            changePlugState(true);
+            changePlugState(true, `Humidity ${humidity} <= ${HUMIDITY}`);
         } else if (humidity > HUMIDITY) {
             console.log(`Turning off humidifier for #${HUMIDITY_ID} due to humidity being too high ${humidity} > ${HUMIDITY} at ${formatNiceDateTime(Date.now())}`);
-            changePlugState(false);
+            changePlugState(false, `Humidity ${humidity} > ${HUMIDITY}`);
         } else {
             console.log(`Humidity is equal to target ${humidity} for #${HUMIDITY_ID} (${HUMIDITY}) at ${formatNiceDateTime(Date.now())}`);
         }
@@ -174,6 +270,8 @@ async function main() {
     {
         void runInfinitePollCallAtStart(timeInMinute, async () => {
             let info = await getThermostat();
+            controlState.thermostat = info.properties;
+            controlState.thermostatTime = Date.now();
             console.log(JSON.stringify({
                 id: THERMOSTAT_ID,
                 time: Date.now(),
@@ -248,6 +346,33 @@ async function main() {
             }
             return thermalLimit.temperature_C;
         }
+        function getOutsideTemperature(): number | undefined {
+            let outside = allData[OUTSIDE_SENSOR];
+            if (!outside) return undefined;
+            if (!("temperature_C" in outside)) return undefined;
+            let timeOff = Math.abs(new Date(outside.time).getTime() - Date.now());
+            if (timeOff > MAX_DATA_AGE) {
+                console.warn(`Outside temperature data is too old for ${OUTSIDE_SENSOR}. Now is ${formatNiceDateTime(Date.now())}, and the outside temperature was at ${formatNiceDateTime(+new Date(outside.time))}, so it is ${formatTime(timeOff)} off`);
+                return undefined;
+            }
+            return outside.temperature_C;
+        }
+
+        function recordAction(action: string, reason: string) {
+            controlState.action = action;
+            controlState.actionReason = reason;
+            controlState.actionTime = Date.now();
+        }
+        function recordSetPoint(kind: "heating" | "cooling", setPoint: number) {
+            controlState.setPointKind = kind;
+            controlState.setPoint = setPoint;
+            controlState.setPointTime = Date.now();
+        }
+        function recordControlTemperature(temperature: number, source: string, target: number) {
+            controlState.controlTemperature = temperature;
+            controlState.controlTemperatureSource = source;
+            controlState.targetTemperature = target;
+        }
 
         async function heatingHandler() {
             let info = await getThermostat();
@@ -255,6 +380,7 @@ async function main() {
                 let thermalLimit = getThermalLimitProbe();
                 if (thermalLimit !== undefined && thermalLimit >= THERMAL_LIMIT) {
                     console.log(`Thermal limit hit ${thermalLimit} >= ${THERMAL_LIMIT} at ${formatNiceDateTime(Date.now())}. Ignoring heating request, and ensuring heat is off`);
+                    recordAction("heating off", `Thermal limit ${thermalLimit} >= ${THERMAL_LIMIT}`);
                     await setHeatingOff();
                     return;
                 }
@@ -265,6 +391,7 @@ async function main() {
                     curTemp = HEATING_SET_POINT_MAX;
                 }
                 await setHeatingTemperature(curTemp);
+                recordSetPoint("heating", curTemp);
             }
             async function setHeatingOff() {
                 let curTemp = info.properties.temperature_celsius;
@@ -274,36 +401,53 @@ async function main() {
                     curTemp = HEATING_SET_POINT_MIN;
                 }
                 await setHeatingTemperature(curTemp);
+                recordSetPoint("heating", curTemp);
             }
-            async function setSuperCooling(status: boolean) {
+            async function setSuperCooling(status: boolean, reason: string) {
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), super_cooling: status }));
-                await PlugFive.setOn(status);
+                await SUPER_COOLING_PLUG.setOn(status);
+                controlState.superCooling = status;
+                controlState.superCoolingReason = reason;
             }
             let realTemperature = getRealTemperature();
             if (realTemperature === undefined) {
-                await setSuperCooling(false);
+                recordAction("none", `No usable room temperature from ${THERMOSTAT_SENSOR}`);
+                await setSuperCooling(false, `No usable room temperature from ${THERMOSTAT_SENSOR}`);
                 return;
             }
 
             let targetTemperature = getCurrentTemperatureFromSets(TEMPERATURE_PLAN);
+            recordControlTemperature(realTemperature, THERMOSTAT_SENSOR, targetTemperature);
 
             if (realTemperature === targetTemperature) {
                 console.log(`Temperature is equal to target ${realTemperature} at ${formatNiceDateTime(Date.now())}. Not touching state`);
-                await setSuperCooling(false);
+                recordAction("none", `Room ${realTemperature} == target ${targetTemperature}`);
+                await setSuperCooling(false, `Room ${realTemperature} == target ${targetTemperature}`);
             } else if (realTemperature < targetTemperature) {
                 console.log(`Turning on heating for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
+                recordAction("heating on", `Room ${realTemperature} < target ${targetTemperature}`);
                 await setHeatingOn();
-                await setSuperCooling(false);
+                await setSuperCooling(false, `Room ${realTemperature} < target ${targetTemperature}`);
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celsius: targetTemperature, is_heating: true }));
             } else if (realTemperature > targetTemperature) {
                 console.log(`Turning off heating for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
+                recordAction("heating off", `Room ${realTemperature} > target ${targetTemperature}`);
                 await setHeatingOff();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celsius: targetTemperature, is_heating: false }));
                 if (realTemperature > targetTemperature + SUPER_COOLING_TEMPERATURE_THRESHOLD) {
-                    console.log(`Turning on super cooling for due to temperature being way too high`);
-                    await setSuperCooling(true);
+                    let outsideTemperature = getOutsideTemperature();
+                    if (outsideTemperature === undefined) {
+                        console.warn(`Not super cooling despite temperature ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, because there is no usable outside temperature from ${OUTSIDE_SENSOR} at ${formatNiceDateTime(Date.now())}`);
+                        await setSuperCooling(false, `Room ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, but no usable outside temperature from ${OUTSIDE_SENSOR}`);
+                    } else if (outsideTemperature > targetTemperature - SUPER_COOLING_OUTSIDE_THRESHOLD) {
+                        console.log(`Not super cooling despite temperature ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, because outside ${outsideTemperature} > ${targetTemperature} - ${SUPER_COOLING_OUTSIDE_THRESHOLD} at ${formatNiceDateTime(Date.now())}`);
+                        await setSuperCooling(false, `Room ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, but outside ${outsideTemperature} > ${targetTemperature} - ${SUPER_COOLING_OUTSIDE_THRESHOLD}`);
+                    } else {
+                        console.log(`Turning on super cooling due to temperature ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, with outside ${outsideTemperature} <= ${targetTemperature} - ${SUPER_COOLING_OUTSIDE_THRESHOLD} at ${formatNiceDateTime(Date.now())}`);
+                        await setSuperCooling(true, `Room ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, outside ${outsideTemperature} <= ${targetTemperature} - ${SUPER_COOLING_OUTSIDE_THRESHOLD}`);
+                    }
                 } else {
-                    await setSuperCooling(false);
+                    await setSuperCooling(false, `Room ${realTemperature} <= ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}`);
                 }
             }
         }
@@ -318,6 +462,7 @@ async function main() {
                     curTemp = COOLING_SET_POINT_MIN;
                 }
                 await setCoolingTemperature(curTemp);
+                recordSetPoint("cooling", curTemp);
             }
             async function setCoolingOff() {
                 let curTemp = info.properties.temperature_celsius;
@@ -330,24 +475,31 @@ async function main() {
                     curTemp = COOLING_SET_POINT_MAX;
                 }
                 await setCoolingTemperature(curTemp);
+                recordSetPoint("cooling", curTemp);
             }
             let realTemperature = getRealTemperature();
+            let temperatureSource = THERMOSTAT_SENSOR;
             if (realTemperature === undefined) {
                 // Silently returning here leaves whatever set point was last written frozen indefinitely, so a dead sensor must not mean "do nothing" — the ecobee's own reading keeps the control loop alive, if less accurately placed.
                 realTemperature = info.properties.temperature_celsius;
+                temperatureSource = THERMOSTAT_ID;
                 console.warn(`No usable sensor data for ${THERMOSTAT_SENSOR}, falling back to the ecobee's own reading of ${realTemperature}C at ${formatNiceDateTime(Date.now())}`);
             }
 
             let targetTemperature = getCurrentTemperatureFromSets(TEMPERATURE_PLAN);
+            recordControlTemperature(realTemperature, temperatureSource, targetTemperature);
 
             if (realTemperature === targetTemperature) {
                 console.log(`Temperature is equal to target ${realTemperature} at ${formatNiceDateTime(Date.now())}. Not touching state`);
+                recordAction("none", `Room ${realTemperature} == target ${targetTemperature}`);
             } else if (realTemperature > targetTemperature) {
                 console.log(`Turning on cooling for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
+                recordAction("cooling on", `Room ${realTemperature} > target ${targetTemperature}`);
                 await setCoolingOn();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, cooling_set_point_celsius: targetTemperature, is_cooling: true }));
             } else if (realTemperature < targetTemperature) {
                 console.log(`Turning off cooling for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
+                recordAction("cooling off", `Room ${realTemperature} < target ${targetTemperature}`);
                 await setCoolingOff();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, cooling_set_point_celsius: targetTemperature, is_cooling: false }));
             }

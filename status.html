@@ -1,0 +1,230 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Climate Status</title>
+<style>
+    :root {
+        --bg: #f6f6f4;
+        --card: #ffffff;
+        --text: #1d1d1b;
+        --muted: #6b6b66;
+        --border: #e2e2dc;
+        --on: #1f8a4c;
+        --off: #8a8a84;
+        --warn: #b4560b;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --bg: #161615;
+            --card: #20201e;
+            --text: #ececea;
+            --muted: #9a9a94;
+            --border: #33332f;
+            --on: #4cc27e;
+            --off: #77776f;
+            --warn: #e89a52;
+        }
+    }
+    body {
+        margin: 0;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, sans-serif;
+    }
+    h1 {
+        font-size: 20px;
+        margin: 0 0 4px;
+    }
+    h2 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin: 0 0 10px;
+    }
+    #connection {
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 16px;
+    }
+    #connection.bad {
+        color: var(--warn);
+    }
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 12px;
+        max-width: 1100px;
+    }
+    .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 16px;
+    }
+    .big {
+        font-size: 34px;
+        font-variant-numeric: tabular-nums;
+    }
+    .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 5px 0;
+        border-top: 1px solid var(--border);
+        font-variant-numeric: tabular-nums;
+    }
+    .row:first-of-type {
+        border-top: none;
+    }
+    .label {
+        color: var(--muted);
+    }
+    .reason {
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 6px;
+    }
+    .on {
+        color: var(--on);
+        font-weight: 600;
+    }
+    .off {
+        color: var(--off);
+        font-weight: 600;
+    }
+    .stale {
+        color: var(--warn);
+    }
+</style>
+</head>
+<body>
+<h1>Climate Status</h1>
+<div id="connection">Connecting...</div>
+<div class="grid" id="content"></div>
+<script>
+const DEFAULT_HOST = "10.0.0.119";
+const PORT = 8090;
+const RECONNECT_DELAY = 3000;
+const AGE_REFRESH_INTERVAL = 1000;
+
+let params = new URLSearchParams(location.search);
+let host = params.get("host") || location.hostname || DEFAULT_HOST;
+let url = `ws://${host}:${PORT}`;
+let status;
+let lastMessageTime;
+let connected = false;
+
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+}
+function formatTemp(value) {
+    return typeof value === "number" ? `${value.toFixed(1)}°C` : "—";
+}
+function formatAge(time) {
+    if (!time) return "never";
+    let seconds = Math.round((Date.now() - time) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    let minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ${seconds % 60}s ago`;
+    return `${Math.floor(minutes / 60)}h ${minutes % 60}m ago`;
+}
+function onOff(value) {
+    if (value === undefined) return `<span class="off">unknown</span>`;
+    return value ? `<span class="on">ON</span>` : `<span class="off">OFF</span>`;
+}
+function row(label, value) {
+    return `<div class="row"><span class="label">${escapeHtml(label)}</span><span>${value}</span></div>`;
+}
+
+function render() {
+    let connection = document.getElementById("connection");
+    connection.className = connected ? "" : "bad";
+    connection.textContent = connected ? `Connected to ${url} · last change ${formatAge(lastMessageTime)}` : `Disconnected from ${url}, retrying...`;
+    if (!status) return;
+    let control = status.control || {};
+    let thermostat = control.thermostat;
+    let setting = thermostat && thermostat.current_climate_setting;
+    let cards = [];
+
+    cards.push(`<div class="card">
+        <h2>Goal (${escapeHtml(status.mode)} mode)</h2>
+        <div class="big">${formatTemp(control.controlTemperature)} → ${formatTemp(control.targetTemperature)}</div>
+        <div class="reason">Room reading from ${escapeHtml(control.controlTemperatureSource || "—")}</div>
+        ${row("Action", escapeHtml(control.action || "—"))}
+        ${row("Decided", formatAge(control.actionTime))}
+        <div class="reason">${escapeHtml(control.actionReason || "")}</div>
+    </div>`);
+
+    cards.push(`<div class="card">
+        <h2>What we set</h2>
+        ${row(`Last ${control.setPointKind || ""} set point sent`, formatTemp(control.setPoint))}
+        ${row("Sent", formatAge(control.setPointTime))}
+        ${row("Super cooling (outside fan)", onOff(control.superCooling))}
+        <div class="reason">${escapeHtml(control.superCoolingReason || "")}</div>
+        ${row("Humidifier", onOff(control.humidifierOn))}
+        <div class="reason">${escapeHtml(control.humidifierReason || "")}</div>
+    </div>`);
+
+    cards.push(`<div class="card">
+        <h2>Sensors</h2>
+        ${status.sensors.map(sensor => {
+            let stale = !sensor.time || Date.now() - sensor.time > status.maxDataAge;
+            let humidity = typeof sensor.humidity === "number" ? ` · ${sensor.humidity}%` : "";
+            return row(`${sensor.role} (#${sensor.id})`, `${formatTemp(sensor.temperature_C)}${humidity} <span class="${stale ? "stale" : "label"}">${formatAge(sensor.time)}</span>`);
+        }).join("")}
+    </div>`);
+
+    cards.push(`<div class="card">
+        <h2>Ecobee</h2>
+        ${thermostat ? `
+            ${row("Reading", formatTemp(thermostat.temperature_celsius))}
+            ${row("HVAC mode", escapeHtml(setting.hvac_mode_setting))}
+            ${row("Fan mode", escapeHtml(setting.fan_mode_setting))}
+            ${row("Heating set point", formatTemp(setting.heating_set_point_celsius))}
+            ${row("Cooling set point", formatTemp(setting.cooling_set_point_celsius))}
+            ${row("Heating", onOff(thermostat.is_heating))}
+            ${row("Cooling", onOff(thermostat.is_cooling))}
+            ${row("Fan running", onOff(thermostat.is_fan_running))}
+            ${row("Polled", formatAge(control.thermostatTime))}
+        ` : `<div class="reason">No thermostat data yet</div>`}
+    </div>`);
+
+    cards.push(`<div class="card">
+        <h2>Config</h2>
+        ${row("Humidity target", `${status.humidityTarget}%`)}
+        ${row("Thermal limit", formatTemp(status.thermalLimit))}
+        ${row("Super cool when room above target by", formatTemp(status.superCoolingTemperatureThreshold))}
+        ${row("Only if outside below target by", formatTemp(status.superCoolingOutsideThreshold))}
+        ${status.temperaturePlan.map(set => row(`Plan from ${set.time}h`, formatTemp(set.temperature))).join("")}
+    </div>`);
+
+    document.getElementById("content").innerHTML = cards.join("");
+}
+
+function connect() {
+    let socket = new WebSocket(url);
+    socket.onopen = () => {
+        connected = true;
+        render();
+    };
+    socket.onmessage = event => {
+        status = JSON.parse(event.data);
+        lastMessageTime = Date.now();
+        render();
+    };
+    socket.onclose = () => {
+        connected = false;
+        render();
+        setTimeout(connect, RECONNECT_DELAY);
+    };
+}
+
+connect();
+setInterval(render, AGE_REFRESH_INTERVAL);
+</script>
+</body>
+</html>

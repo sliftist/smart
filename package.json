@@ -16,7 +16,8 @@
     "toast": "yarn toaster",
     "printer": "yarn typenode ./printer.ts",
     "print": "yarn printer",
-    "tooth": "yarn typenode ./tooth.ts"
+    "tooth": "yarn typenode ./tooth.ts",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "mobx": "^6.15.0",
@@ -24,6 +25,10 @@
     "tp-link-tapo-connect": "2.0.15",
     "typedev": "^0.4.0",
     "typenode": "^5.12.0",
-    "unofficial-rtl_433-binaries": "^25.2.2"
+    "unofficial-rtl_433-binaries": "^25.2.2",
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
   }
 }
