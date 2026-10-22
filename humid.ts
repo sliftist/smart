@@ -432,12 +432,14 @@ async function main() {
                         return;
                     }
                     let outsideTemperature = outsideReading.temperature;
-                    if (outsideTemperature > targetTemperature - SUPER_COOLING_OUTSIDE_THRESHOLD) {
-                        console.log(`Not super cooling despite temperature ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, because outside ${outsideTemperature} > ${targetTemperature} - ${SUPER_COOLING_OUTSIDE_THRESHOLD} at ${formatNiceDateTime(Date.now())}`);
-                        await setSuperCooling(false, `Room ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, but outside ${outsideTemperature} > ${targetTemperature} - ${SUPER_COOLING_OUTSIDE_THRESHOLD}`);
+                    let outsideReference = Math.max(targetTemperature, realTemperature);
+                    let outsideLimit = outsideReference - SUPER_COOLING_OUTSIDE_THRESHOLD;
+                    if (outsideTemperature > outsideLimit) {
+                        console.log(`Not super cooling despite temperature ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, because outside ${outsideTemperature} > max(target ${targetTemperature}, room ${realTemperature}) - ${SUPER_COOLING_OUTSIDE_THRESHOLD} = ${outsideLimit} at ${formatNiceDateTime(Date.now())}`);
+                        await setSuperCooling(false, `Room ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, but outside ${outsideTemperature} > ${outsideReference} - ${SUPER_COOLING_OUTSIDE_THRESHOLD} = ${outsideLimit}`);
                     } else {
-                        console.log(`Turning on super cooling due to temperature ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, with outside ${outsideTemperature} <= ${targetTemperature} - ${SUPER_COOLING_OUTSIDE_THRESHOLD} at ${formatNiceDateTime(Date.now())}`);
-                        await setSuperCooling(true, `Room ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, outside ${outsideTemperature} <= ${targetTemperature} - ${SUPER_COOLING_OUTSIDE_THRESHOLD}`);
+                        console.log(`Turning on super cooling due to temperature ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, with outside ${outsideTemperature} <= max(target ${targetTemperature}, room ${realTemperature}) - ${SUPER_COOLING_OUTSIDE_THRESHOLD} = ${outsideLimit} at ${formatNiceDateTime(Date.now())}`);
+                        await setSuperCooling(true, `Room ${realTemperature} > ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}, outside ${outsideTemperature} <= ${outsideReference} - ${SUPER_COOLING_OUTSIDE_THRESHOLD} = ${outsideLimit}`);
                     }
                 } else {
                     await setSuperCooling(false, `Room ${realTemperature} <= ${targetTemperature} + ${SUPER_COOLING_TEMPERATURE_THRESHOLD}`);

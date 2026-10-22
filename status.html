@@ -14,6 +14,10 @@
         --on: #1f8a4c;
         --off: #8a8a84;
         --warn: #b4560b;
+        --heat: #d9622b;
+        --cool: #2b7bd9;
+        --idle: #9a9a90;
+        --humid: #1f9a8a;
     }
     @media (prefers-color-scheme: dark) {
         :root {
@@ -25,18 +29,18 @@
             --on: #4cc27e;
             --off: #77776f;
             --warn: #e89a52;
+            --heat: #f08a55;
+            --cool: #5aa2f0;
+            --idle: #8a8a82;
+            --humid: #3cc3b0;
         }
     }
     body {
         margin: 0;
-        padding: 16px;
+        padding: 10px;
         background: var(--bg);
         color: var(--text);
         font-family: system-ui, sans-serif;
-    }
-    h1 {
-        font-size: 20px;
-        margin: 0 0 4px;
     }
     h2 {
         font-size: 13px;
@@ -45,14 +49,15 @@
         color: var(--muted);
         margin: 0 0 10px;
     }
-    #building {
-        font-size: 15px;
-        margin-bottom: 4px;
+    h3 {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0 0 6px;
     }
     #connection {
         color: var(--muted);
         font-size: 13px;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
     }
     #connection.bad {
         color: var(--warn);
@@ -60,19 +65,115 @@
     .grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 12px;
+        gap: 8px;
         max-width: 1100px;
     }
     .card {
         background: var(--card);
         border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 14px 16px;
+        border-radius: 8px;
+        padding: 10px 12px;
+        min-width: 0;
     }
-    .state {
-        font-size: 34px;
+    .wide {
+        grid-column: 1 / -1;
+    }
+    .charts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 20px;
+    }
+    .chart-block {
+        flex: 1 1 260px;
+        min-width: 0;
+    }
+    .chart {
+        position: relative;
+        height: 280px;
+        margin-left: 52px;
+        border-radius: 6px;
+        overflow: visible;
+    }
+    .chart.short {
+        height: 200px;
+    }
+    .zone {
+        position: absolute;
+        left: 0;
+        right: 0;
+        background: color-mix(in srgb, var(--zone) 14%, transparent);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-right: 10px;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+    .zone .zone-label {
+        font-size: 12px;
+        color: var(--muted);
+        text-align: right;
+    }
+    .zone.active {
+        background: color-mix(in srgb, var(--zone) 38%, transparent);
+        box-shadow: inset 4px 0 0 var(--zone);
+    }
+    .zone.active .zone-label {
+        color: var(--text);
         font-weight: 700;
-        margin: 2px 0 8px;
+    }
+    .zone.blocked {
+        background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--zone) 10%, transparent) 0 6px, transparent 6px 12px);
+    }
+    .line {
+        position: absolute;
+        left: 0;
+        right: 0;
+        border-top: 1px dashed var(--muted);
+    }
+    .line .value {
+        position: absolute;
+        right: 100%;
+        margin-right: 6px;
+        transform: translateY(-50%);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+        white-space: nowrap;
+    }
+    .line .name {
+        position: absolute;
+        left: 6px;
+        bottom: 1px;
+        font-size: 11px;
+        color: var(--muted);
+        white-space: nowrap;
+    }
+    .marker {
+        position: absolute;
+        left: 0;
+        right: 0;
+        border-top: 2px solid var(--text);
+        z-index: 2;
+    }
+    .marker .pill {
+        position: absolute;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--text);
+        color: var(--card);
+        font-size: 12px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 999px;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+    .marker.stale {
+        border-top-color: var(--warn);
+    }
+    .marker.stale .pill {
+        background: var(--warn);
     }
     .row {
         display: flex;
@@ -88,7 +189,7 @@
     .reason {
         color: var(--muted);
         font-size: 13px;
-        margin: 6px 0;
+        margin: 6px 0 0;
     }
     .on {
         color: var(--on);
@@ -101,18 +202,16 @@
     }
     details {
         max-width: 1100px;
-        margin-top: 16px;
+        margin-top: 8px;
     }
     summary {
         cursor: pointer;
         color: var(--muted);
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
 </style>
 </head>
 <body>
-<h1>Climate Status</h1>
-<div id="building"></div>
 <div id="connection">Connecting...</div>
 <div class="grid" id="content"></div>
 <details>
@@ -124,6 +223,9 @@ const DEFAULT_HOST = "10.0.0.119";
 const PORT = 8090;
 const RECONNECT_DELAY = 3000;
 const AGE_REFRESH_INTERVAL = 1000;
+const TEMPERATURE_PADDING = 2;
+const MARKER_PADDING = 1;
+const HUMIDITY_PADDING = 10;
 
 let params = new URLSearchParams(location.search);
 let host = params.get("host") || location.hostname || DEFAULT_HOST;
@@ -153,54 +255,173 @@ function onOff(value) {
 function row(label, value) {
     return `<div class="row"><span class="label">${escapeHtml(label)}</span><span>${value}</span></div>`;
 }
-function sensorRow(label, sensor) {
-    if (!sensor) return row(label, "—");
-    let stale = !sensor.time || Date.now() - sensor.time > status.maxDataAge;
-    let humidity = typeof sensor.humidity === "number" ? ` · ${sensor.humidity}%` : "";
-    return row(`${label} (#${sensor.id})`, `${formatTemp(sensor.temperature_C)}${humidity} <span class="${stale ? "stale" : "label"}">${formatAge(sensor.time)}</span>`);
+function card(title, body, className = "") {
+    return `<div class="card ${className}">${title ? `<h2>${escapeHtml(title)}</h2>` : ""}${body}</div>`;
 }
-function card(title, body) {
-    return `<div class="card"><h2>${escapeHtml(title)}</h2>${body}</div>`;
+function isOff(value) {
+    return value !== undefined && !value;
+}
+function isStale(time) {
+    return !time || Date.now() - time > status.maxDataAge;
+}
+function getPlanTemperature(plan) {
+    let sorted = [...plan].sort((a, b) => a.time - b.time);
+    let hour = new Date().getHours() + new Date().getMinutes() / 60;
+    let current = sorted[sorted.length - 1];
+    for (let set of sorted) {
+        if (set.time <= hour) {
+            current = set;
+        }
+    }
+    return current.temperature;
+}
+
+function scaleChart({ min, max, zones, lines, markers, format, short }) {
+    let y = value => ((max - value) / (max - min)) * 100;
+    let clamp = value => Math.min(max, Math.max(min, value));
+    let html = `<div class="chart ${short ? "short" : ""}">`;
+    for (let zone of zones) {
+        let top = y(clamp(zone.to));
+        let bottom = y(clamp(zone.from));
+        if (bottom - top <= 0) continue;
+        let classes = ["zone", zone.active ? "active" : "", zone.blocked ? "blocked" : ""].join(" ");
+        html += `<div class="${classes}" style="--zone: var(${zone.color}); top: ${top}%; height: ${bottom - top}%"><span class="zone-label">${escapeHtml(zone.label)}</span></div>`;
+    }
+    let merged = new Map();
+    for (let line of lines) {
+        let key = line.value.toFixed(2);
+        let existing = merged.get(key);
+        if (existing) {
+            existing.names.push(line.name);
+        } else {
+            merged.set(key, { value: line.value, names: [line.name] });
+        }
+    }
+    for (let line of merged.values()) {
+        html += `<div class="line" style="top: ${y(line.value)}%"><span class="value">${escapeHtml(format(line.value))}</span><span class="name">${escapeHtml(line.names.join(" · "))}</span></div>`;
+    }
+    for (let marker of markers) {
+        if (typeof marker.value !== "number") continue;
+        html += `<div class="marker ${marker.stale ? "stale" : ""}" style="top: ${y(clamp(marker.value))}%"><span class="pill">${escapeHtml(marker.label)} ${escapeHtml(format(marker.value))}${marker.stale ? " (stale)" : ""}</span></div>`;
+    }
+    return html + `</div>`;
+}
+function rangeFor(values, padding, markerValues) {
+    let all = [...values];
+    let lowest = Math.min(...all) - padding;
+    let highest = Math.max(...all) + padding;
+    for (let value of markerValues) {
+        if (typeof value !== "number") continue;
+        lowest = Math.min(lowest, value - MARKER_PADDING);
+        highest = Math.max(highest, value + MARKER_PADDING);
+    }
+    return { min: lowest, max: highest };
 }
 
 function render() {
     let connection = document.getElementById("connection");
     connection.className = connected ? "" : "bad";
-    connection.textContent = connected ? `Connected to ${url} · last change ${formatAge(lastMessageTime)}` : `Disconnected from ${url}, retrying...`;
+    connection.style.display = connected ? "none" : "";
+    connection.textContent = `Disconnected from ${url}, retrying...`;
     if (!status) return;
     let control = status.control || {};
     let thermostat = control.thermostat;
     let setting = thermostat && thermostat.current_climate_setting;
     let sensor = role => status.sensors.find(s => s.role === role);
-    let inside = sensor("room (control)");
-    let outside = sensor("outside");
-    let humiditySensor = sensor("humidity");
+    let inside = sensor("room (control)") || {};
+    let outside = sensor("outside") || {};
+    let humiditySensor = sensor("humidity") || {};
     let heating = status.buildingMode === "heating";
-
-    document.getElementById("building").innerHTML = `Building is <b>${escapeHtml(status.buildingMode)}</b> <span class="label">(set by the building, not us)</span>`;
+    let target = typeof control.targetTemperature === "number" ? control.targetTemperature : getPlanTemperature(status.temperaturePlan);
 
     let cards = [];
-    cards.push(card(heating ? "Heating" : "Cooling", `
-        <div class="state">${onOff(control.hvacOn)}</div>
-        ${sensorRow("Inside", inside)}
-        ${row("Target", formatTemp(control.targetTemperature))}
-        <div class="reason">${escapeHtml(control.hvacReason || "")} · ${formatAge(control.hvacTime)}</div>
-    `));
-    cards.push(card("Super cooling (window fan)", `
-        <div class="state">${onOff(heating ? control.superCooling : false)}</div>
-        ${sensorRow("Outside", outside)}
-        ${row("Needs inside above target by", formatTemp(status.superCoolingTemperatureThreshold))}
-        ${row("Needs outside below target by", formatTemp(status.superCoolingOutsideThreshold))}
-        <div class="reason">${heating ? escapeHtml(control.superCoolingReason || "") : "Only used while the building is heating"}</div>
-    `));
-    cards.push(card("Humidifier", `
-        <div class="state">${onOff(control.humidifierOn)}</div>
-        ${row(`Humidity (#${humiditySensor ? humiditySensor.id : "?"})`, typeof (humiditySensor && humiditySensor.humidity) === "number" ? `${humiditySensor.humidity}% <span class="${Date.now() - humiditySensor.time > status.maxDataAge ? "stale" : "label"}">${formatAge(humiditySensor.time)}</span>` : "—")}
-        ${row("Target", `${status.humidityTarget}%`)}
+    if (heating) {
+        let superAbove = target + status.superCoolingTemperatureThreshold;
+        let outsideReference = typeof inside.temperature_C === "number" ? Math.max(target, inside.temperature_C) : target;
+        let outsideBelow = outsideReference - status.superCoolingOutsideThreshold;
+        let outsideColdEnough = typeof outside.temperature_C === "number" && !isStale(outside.time) && outside.temperature_C <= outsideBelow;
+        let insideRange = rangeFor([target, superAbove], TEMPERATURE_PADDING, [inside.temperature_C]);
+        let outsideRange = rangeFor([outsideBelow], TEMPERATURE_PADDING * 2, [outside.temperature_C]);
+        cards.push(card("", `
+            <div class="charts">
+                <div class="chart-block">
+                    <h3>Inside (#${escapeHtml(inside.id || "?")})</h3>
+                    ${scaleChart({
+                        ...insideRange,
+                        format: formatTemp,
+                        zones: [
+                            { from: insideRange.min, to: target, label: "Heating on", color: "--heat", active: !!control.hvacOn },
+                            { from: target, to: superAbove, label: "Heating off", color: "--idle", active: isOff(control.hvacOn) && !control.superCooling },
+                            { from: superAbove, to: insideRange.max, label: outsideColdEnough ? "Super cooling" : "Super cooling (outside too warm)", color: "--cool", active: !!control.superCooling, blocked: !outsideColdEnough },
+                        ],
+                        lines: [
+                            { value: target, name: "Target" },
+                            { value: superAbove, name: `Target + ${status.superCoolingTemperatureThreshold}` },
+                        ],
+                        markers: [{ value: inside.temperature_C, label: "Inside", stale: isStale(inside.time) }],
+                    })}
+                    <div class="reason">${escapeHtml(control.hvacReason || "")} · ${formatAge(control.hvacTime)}</div>
+                </div>
+                <div class="chart-block">
+                    <h3>Outside (#${escapeHtml(outside.id || "?")})</h3>
+                    ${scaleChart({
+                        ...outsideRange,
+                        format: formatTemp,
+                        zones: [
+                            { from: outsideRange.min, to: outsideBelow, label: "Cold enough to super cool", color: "--cool", active: outsideColdEnough },
+                            { from: outsideBelow, to: outsideRange.max, label: "Too warm to super cool", color: "--idle", active: !outsideColdEnough },
+                        ],
+                        lines: [
+                            { value: outsideBelow, name: `max(target, inside) − ${status.superCoolingOutsideThreshold}` },
+                        ],
+                        markers: [{ value: outside.temperature_C, label: "Outside", stale: isStale(outside.time) }],
+                    })}
+                    <div class="reason">${escapeHtml(control.superCoolingReason || "")}</div>
+                </div>
+            </div>
+        `, "wide"));
+    } else {
+        let insideRange = rangeFor([target], TEMPERATURE_PADDING, [inside.temperature_C]);
+        cards.push(card("", `
+            <div class="charts">
+                <div class="chart-block">
+                    <h3>Inside (#${escapeHtml(inside.id || "?")})</h3>
+                    ${scaleChart({
+                        ...insideRange,
+                        format: formatTemp,
+                        zones: [
+                            { from: insideRange.min, to: target, label: "Cooling off", color: "--idle", active: isOff(control.hvacOn) },
+                            { from: target, to: insideRange.max, label: "Cooling on", color: "--cool", active: !!control.hvacOn },
+                        ],
+                        lines: [{ value: target, name: "Target" }],
+                        markers: [{ value: inside.temperature_C, label: "Inside", stale: isStale(inside.time) }],
+                    })}
+                    <div class="reason">${escapeHtml(control.hvacReason || "")} · ${formatAge(control.hvacTime)}</div>
+                </div>
+            </div>
+        `, "wide"));
+    }
+
+    let humidityRange = rangeFor([status.humidityTarget], HUMIDITY_PADDING, [humiditySensor.humidity]);
+    let formatHumidity = value => `${Math.round(value)}%`;
+    cards.push(card("", `
+        <h3>Humidity (#${escapeHtml(humiditySensor.id || "?")})</h3>
+        ${scaleChart({
+            ...humidityRange,
+            short: true,
+            format: formatHumidity,
+            zones: [
+                { from: humidityRange.min, to: status.humidityTarget, label: "Humidifier on", color: "--humid", active: !!control.humidifierOn },
+                { from: status.humidityTarget, to: humidityRange.max, label: "Humidifier off", color: "--idle", active: isOff(control.humidifierOn) },
+            ],
+            lines: [{ value: status.humidityTarget, name: "Target" }],
+            markers: [{ value: humiditySensor.humidity, label: "Humidity", stale: isStale(humiditySensor.time) }],
+        })}
         <div class="reason">${escapeHtml(control.humidifierReason || "")}</div>
     `));
     document.getElementById("content").innerHTML = cards.join("");
 
+    let thermalLimit = sensor("thermal limit") || {};
     let details = [];
     details.push(card("Ecobee", thermostat ? `
         ${row("Reading", formatTemp(thermostat.temperature_celsius))}
@@ -218,7 +439,7 @@ function render() {
         ${row("Inside reading used from", escapeHtml(control.controlTemperatureSource || "—"))}
     `));
     details.push(card("Other sensors & config", `
-        ${sensorRow("Thermal limit", sensor("thermal limit"))}
+        ${row(`Thermal limit sensor (#${thermalLimit.id || "?"})`, `${formatTemp(thermalLimit.temperature_C)} <span class="${isStale(thermalLimit.time) ? "stale" : "label"}">${formatAge(thermalLimit.time)}</span>`)}
         ${row("Thermal limit", formatTemp(status.thermalLimit))}
         ${status.temperaturePlan.map(set => row(`Plan from ${set.time}h`, formatTemp(set.temperature))).join("")}
     `));
