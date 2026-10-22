@@ -3,7 +3,7 @@ import { formatNiceDateTime, formatTime, formatVeryNiceDateTime } from "socket-f
 import { linesToObjects, objectsToObservable, watchDirectory, watchFile } from "./logWatcher";
 import { PlugFive, PlugOne } from "./plug";
 import { timeInMinute } from "socket-function/src/misc";
-import { getThermostat, setHeatingTemperatureFahrenheit, setCoolingTemperatureFahrenheit } from "./ac";
+import { getThermostat, setHeatingTemperature, setCoolingTemperature } from "./ac";
 import { dailyCallback } from "./scheduler";
 import { runInfinitePoll, runInfinitePollCallAtStart } from "socket-function/src/batching";
 
@@ -36,14 +36,16 @@ const PLUG = PlugOne;
 
 const THERMOSTAT_ID = "ecobee";
 const THERMOSTAT_SENSOR = "154";
-const THERMOSTAT_FORCE_OFFSET = 3;
+const THERMOSTAT_FORCE_OFFSET = 1.5;
 
-// The thermostat only accepts cooling set points within this Fahrenheit range; anything outside is rejected with a permanent 400 (cooling_set_point_out_of_range), so we must clamp before sending.
-const COOLING_SET_POINT_MIN_F = 65;
-const COOLING_SET_POINT_MAX_F = 92;
+const COOLING_SET_POINT_MIN = 18.5;
+const COOLING_SET_POINT_MAX = 33;
 
 // Comfort bound for how high we push the set point when forcing cooling off — well inside the hardware max.
-const COOLING_OFF_MAX_F = 77;
+const COOLING_OFF_MAX = 25;
+
+const HEATING_SET_POINT_MIN = 15.5;
+const HEATING_SET_POINT_MAX = 25;
 
 const THERMAL_LIMIT_ID = "173";
 const THERMAL_LIMIT = 25;
@@ -57,9 +59,9 @@ const SUPER_COOLING_TEMPERATURE_THRESHOLD = 100;
 
 // TODO: Adjust the temperature targets slightly based on outside temperatures.
 let TEMPERATURE_PLAN = [
-    { time: 0, temperature: 21.5 },
-    { time: 9.5, temperature: 21.5 },
-    { time: 12.5, temperature: 21.5 },
+    { time: 0, temperature: 20.5 },
+    { time: 9.5, temperature: 20.5 },
+    { time: 12.5, temperature: 20.5 },
 ];
 
 
@@ -256,22 +258,22 @@ async function main() {
                     await setHeatingOff();
                     return;
                 }
-                let curTemp = info.properties.temperature_fahrenheit;
+                let curTemp = info.properties.temperature_celsius;
                 curTemp += THERMOSTAT_FORCE_OFFSET;
-                if (curTemp > 77) {
-                    curTemp = 77;
-                    console.warn(`Tried to set temperature too high (${curTemp}F), limiting to 77F (25C)`);
+                if (curTemp > HEATING_SET_POINT_MAX) {
+                    console.warn(`Tried to set heating set point too high (${curTemp}C), limiting to ${HEATING_SET_POINT_MAX}C`);
+                    curTemp = HEATING_SET_POINT_MAX;
                 }
-                await setHeatingTemperatureFahrenheit(curTemp);
+                await setHeatingTemperature(curTemp);
             }
             async function setHeatingOff() {
-                let curTemp = info.properties.temperature_fahrenheit;
+                let curTemp = info.properties.temperature_celsius;
                 curTemp -= THERMOSTAT_FORCE_OFFSET;
-                if (curTemp < 60) {
-                    curTemp = 60;
-                    console.warn(`Tried to set temperature too low (${curTemp}F), limiting to 60F (15.6C)`);
+                if (curTemp < HEATING_SET_POINT_MIN) {
+                    console.warn(`Tried to set heating set point too low (${curTemp}C), limiting to ${HEATING_SET_POINT_MIN}C`);
+                    curTemp = HEATING_SET_POINT_MIN;
                 }
-                await setHeatingTemperatureFahrenheit(curTemp);
+                await setHeatingTemperature(curTemp);
             }
             async function setSuperCooling(status: boolean) {
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), super_cooling: status }));
@@ -309,25 +311,25 @@ async function main() {
         async function coolingHandler() {
             let info = await getThermostat();
             async function setCoolingOn() {
-                let curTemp = info.properties.temperature_fahrenheit;
+                let curTemp = info.properties.temperature_celsius;
                 curTemp -= THERMOSTAT_FORCE_OFFSET;
-                if (curTemp < COOLING_SET_POINT_MIN_F) {
-                    console.warn(`Tried to set cooling set point too low (${curTemp}F), limiting to ${COOLING_SET_POINT_MIN_F}F`);
-                    curTemp = COOLING_SET_POINT_MIN_F;
+                if (curTemp < COOLING_SET_POINT_MIN) {
+                    console.warn(`Tried to set cooling set point too low (${curTemp}C), limiting to ${COOLING_SET_POINT_MIN}C`);
+                    curTemp = COOLING_SET_POINT_MIN;
                 }
-                await setCoolingTemperatureFahrenheit(curTemp);
+                await setCoolingTemperature(curTemp);
             }
             async function setCoolingOff() {
-                let curTemp = info.properties.temperature_fahrenheit;
+                let curTemp = info.properties.temperature_celsius;
                 curTemp += THERMOSTAT_FORCE_OFFSET;
-                if (curTemp > COOLING_OFF_MAX_F) {
-                    console.warn(`Tried to set cooling set point too high (${curTemp}F), limiting to ${COOLING_OFF_MAX_F}F`);
-                    curTemp = COOLING_OFF_MAX_F;
+                if (curTemp > COOLING_OFF_MAX) {
+                    console.warn(`Tried to set cooling set point too high (${curTemp}C), limiting to ${COOLING_OFF_MAX}C`);
+                    curTemp = COOLING_OFF_MAX;
                 }
-                if (curTemp > COOLING_SET_POINT_MAX_F) {
-                    curTemp = COOLING_SET_POINT_MAX_F;
+                if (curTemp > COOLING_SET_POINT_MAX) {
+                    curTemp = COOLING_SET_POINT_MAX;
                 }
-                await setCoolingTemperatureFahrenheit(curTemp);
+                await setCoolingTemperature(curTemp);
             }
             let realTemperature = getRealTemperature();
             if (realTemperature === undefined) {
