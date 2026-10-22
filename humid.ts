@@ -25,7 +25,7 @@ process.on("uncaughtException", (error) => {
     console.error("Uncaught exception:", error);
 });
 
-const MODE = "cooling" as "heating" | "cooling";
+const MODE = "heating" as "heating" | "cooling";
 
 const HUMIDITY_ID = "132";
 const HUMIDITY = 45;
