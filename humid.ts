@@ -3,7 +3,7 @@ import { formatNiceDateTime, formatTime, formatVeryNiceDateTime } from "socket-f
 import { linesToObjects, objectsToObservable, watchDirectory, watchFile } from "./logWatcher";
 import { PlugNine, PlugOne } from "./plug";
 import { timeInMinute } from "socket-function/src/misc";
-import { getThermostat, setHeatingTemperature, setCoolingTemperature } from "./ac";
+import { getThermostat, setHeatingTemperature, setCoolingTemperature, setThermostatOff } from "./ac";
 import { dailyCallback } from "./scheduler";
 import { runInfinitePoll, runInfinitePollCallAtStart } from "socket-function/src/batching";
 import { WebSocketServer, WebSocket } from "ws";
@@ -40,12 +40,7 @@ const THERMOSTAT_SENSOR = "154";
 const THERMOSTAT_FORCE_OFFSET = 1.5;
 
 const COOLING_SET_POINT_MIN = 18.5;
-const COOLING_SET_POINT_MAX = 33;
 
-// Comfort bound for how high we push the set point when forcing cooling off — well inside the hardware max.
-const COOLING_OFF_MAX = 25;
-
-const HEATING_SET_POINT_MIN = 15.5;
 const HEATING_SET_POINT_MAX = 25;
 
 const THERMAL_LIMIT_ID = "173";
@@ -363,6 +358,13 @@ async function main() {
             controlState.targetTemperature = target;
         }
 
+        async function turnThermostatOff(info: ThermostatInfo) {
+            let previousMode = info.properties.current_climate_setting.hvac_mode_setting;
+            if (previousMode === "off") return;
+            console.log(`[pid ${process.pid}] Turning thermostat off (was ${previousMode}, room ${info.properties.temperature_celsius}C on the ecobee) at ${formatNiceDateTime(Date.now())}`);
+            await setThermostatOff();
+        }
+
         async function heatingHandler() {
             let info = await getThermostat();
             async function setHeatingOn() {
@@ -383,14 +385,7 @@ async function main() {
                 recordSetPoint("heating", curTemp);
             }
             async function setHeatingOff() {
-                let curTemp = info.properties.temperature_celsius;
-                curTemp -= THERMOSTAT_FORCE_OFFSET;
-                if (curTemp < HEATING_SET_POINT_MIN) {
-                    console.warn(`Tried to set heating set point too low (${curTemp}C), limiting to ${HEATING_SET_POINT_MIN}C`);
-                    curTemp = HEATING_SET_POINT_MIN;
-                }
-                await setHeatingTemperature(curTemp);
-                recordSetPoint("heating", curTemp);
+                await turnThermostatOff(info);
             }
             async function setSuperCooling(status: boolean, reason: string) {
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), super_cooling: status }));
@@ -460,17 +455,7 @@ async function main() {
                 recordSetPoint("cooling", curTemp);
             }
             async function setCoolingOff() {
-                let curTemp = info.properties.temperature_celsius;
-                curTemp += THERMOSTAT_FORCE_OFFSET;
-                if (curTemp > COOLING_OFF_MAX) {
-                    console.warn(`Tried to set cooling set point too high (${curTemp}C), limiting to ${COOLING_OFF_MAX}C`);
-                    curTemp = COOLING_OFF_MAX;
-                }
-                if (curTemp > COOLING_SET_POINT_MAX) {
-                    curTemp = COOLING_SET_POINT_MAX;
-                }
-                await setCoolingTemperature(curTemp);
-                recordSetPoint("cooling", curTemp);
+                await turnThermostatOff(info);
             }
             let roomReading = readSensorTemperature(THERMOSTAT_SENSOR, "room");
             let realTemperature: number;

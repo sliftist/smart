@@ -82,6 +82,12 @@ export async function setHvacMode(mode: "off" | "cool" | "heat" | "heat_cool") {
     });
 }
 
+export async function setThermostatOff() {
+    return await seamApiCall("/thermostats/off", {
+        device_id: THERMOSTAT_ID,
+    });
+}
+
 export async function setFanMode(mode: "auto" | "on") {
     return await seamApiCall("/thermostats/set_fan_mode", {
         device_id: THERMOSTAT_ID,
