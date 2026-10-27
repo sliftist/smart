@@ -54,13 +54,13 @@ const TEMPERATURE_POLL_RATE = timeInMinute * 2.5;
 const SUPER_COOLING_PLUG = PlugNine;
 const SUPER_COOLING_TEMPERATURE_THRESHOLD = 3;
 const OUTSIDE_SENSOR = "24";
-const SUPER_COOLING_OUTSIDE_THRESHOLD = 3;
+const SUPER_COOLING_OUTSIDE_THRESHOLD = 2;
 
 // TODO: Adjust the temperature targets slightly based on outside temperatures.
 let TEMPERATURE_PLAN = [
-    { time: 0, temperature: 18.5 },
-    { time: 9.5, temperature: 18.5 },
-    { time: 12.5, temperature: 18.5 },
+    { time: 0, temperature: 20 },
+    { time: 9.5, temperature: 20 },
+    { time: 12.5, temperature: 20 },
 ];
 
 
@@ -410,13 +410,13 @@ async function main() {
                 await setSuperCooling(false, `Room ${realTemperature} == target ${targetTemperature}`);
             } else if (realTemperature < targetTemperature) {
                 console.log(`Turning on heating for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
-                recordHvac(true,`Room ${realTemperature} < target ${targetTemperature}`);
+                recordHvac(true, `Room ${realTemperature} < target ${targetTemperature}`);
                 await setHeatingOn();
                 await setSuperCooling(false, `Room ${realTemperature} < target ${targetTemperature}`);
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celsius: targetTemperature, is_heating: true }));
             } else if (realTemperature > targetTemperature) {
                 console.log(`Turning off heating for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
-                recordHvac(false,`Room ${realTemperature} > target ${targetTemperature}`);
+                recordHvac(false, `Room ${realTemperature} > target ${targetTemperature}`);
                 await setHeatingOff();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, heating_set_point_celsius: targetTemperature, is_heating: false }));
                 if (realTemperature > targetTemperature + SUPER_COOLING_TEMPERATURE_THRESHOLD) {
@@ -477,12 +477,12 @@ async function main() {
                 recordHvac(undefined, `Room ${realTemperature} == target ${targetTemperature}, leaving as is`);
             } else if (realTemperature > targetTemperature) {
                 console.log(`Turning on cooling for due to temperature being too high ${realTemperature} > ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
-                recordHvac(true,`Room ${realTemperature} > target ${targetTemperature}`);
+                recordHvac(true, `Room ${realTemperature} > target ${targetTemperature}`);
                 await setCoolingOn();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, cooling_set_point_celsius: targetTemperature, is_cooling: true }));
             } else if (realTemperature < targetTemperature) {
                 console.log(`Turning off cooling for due to temperature being too low ${realTemperature} < ${targetTemperature} at ${formatNiceDateTime(Date.now())}`);
-                recordHvac(false,`Room ${realTemperature} < target ${targetTemperature}`);
+                recordHvac(false, `Room ${realTemperature} < target ${targetTemperature}`);
                 await setCoolingOff();
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), temperature_celsius: realTemperature, cooling_set_point_celsius: targetTemperature, is_cooling: false }));
             }
