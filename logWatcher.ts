@@ -176,7 +176,7 @@ export function watchFile(filePath: string): AsyncIterable<string> {
 
     return iterable;
 }
-const MAX_FUTURE_TIMESTAMP_SKEW_MS = 5 * 60 * 1000;
+export const MAX_FUTURE_TIMESTAMP_SKEW_MS = 5 * 60 * 1000;
 
 type ObjectUnknown = Record<string, unknown>;
 // Ignores lines that can't be JSON parsed. 

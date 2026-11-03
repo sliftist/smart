@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recording Viewer</title>
+<style>
+:root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --text: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --cursor: #0b0b0b;
+    --highlight: #fff4d6;
+    --on: #2a78d6;
+    --off: #e1e0d9;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --series-5: #e87ba4;
+    --series-6: #008300;
+    --series-7: #6250d6;
+    --series-8: #e34948;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --page: #0d0d0d;
+        --surface: #1a1a19;
+        --text: #f0efec;
+        --text-secondary: #c3c2b7;
+        --muted: #898781;
+        --grid: #2c2c2a;
+        --axis: #383835;
+        --border: rgba(255, 255, 255, 0.10);
+        --cursor: #f0efec;
+        --highlight: #3a3220;
+        --on: #3987e5;
+        --off: #383835;
+        --series-1: #3987e5;
+        --series-2: #d95926;
+        --series-3: #199e70;
+        --series-4: #c98500;
+        --series-5: #d55181;
+        --series-6: #008300;
+        --series-7: #9085e9;
+        --series-8: #e66767;
+    }
+}
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text: #f0efec;
+    --text-secondary: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --cursor: #f0efec;
+    --highlight: #3a3220;
+    --on: #3987e5;
+    --off: #383835;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+}
+* {
+    box-sizing: border-box;
+}
+body {
+    margin: 0;
+    padding: 16px;
+    background: var(--page);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+}
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+}
+h2 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 8px;
+}
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.time {
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.sub {
+    color: var(--text-secondary);
+}
+button, select {
+    font: inherit;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--page);
+    color: var(--text);
+    cursor: pointer;
+}
+input[type=range] {
+    width: 100%;
+    margin: 10px 0 2px;
+}
+svg {
+    display: block;
+    width: 100%;
+    touch-action: none;
+    cursor: crosshair;
+}
+svg text {
+    font-size: 11px;
+    fill: var(--muted);
+}
+svg .label {
+    fill: var(--text-secondary);
+}
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 6px;
+    color: var(--text-secondary);
+}
+.swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: -1px;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-variant-numeric: tabular-nums;
+}
+th, td {
+    text-align: left;
+    padding: 3px 8px;
+    border-bottom: 1px solid var(--grid);
+    white-space: nowrap;
+}
+th {
+    color: var(--muted);
+    font-weight: 500;
+}
+tr.current td {
+    background: var(--highlight);
+}
+.error {
+    color: #d03b3b;
+}
+#tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    display: none;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+</style>
+</head>
+<body>
+<div class="panel">
+    <div class="controls">
+        <span class="time" id="time">Loading...</span>
+        <span class="sub" id="timeSub"></span>
+    </div>
+    <input type="range" id="slider" min="0" max="0" value="0" step="any">
+    <div class="controls">
+        <button id="prev" title="Previous event (left arrow)">◀ Prev event</button>
+        <button id="next" title="Next event (right arrow)">Next event ▶</button>
+        <button id="play">Play</button>
+        <select id="speed">
+            <option value="10">10x</option>
+            <option value="60" selected>60x</option>
+            <option value="600">600x</option>
+        </select>
+        <select id="hours">
+            <option value="1">Last 1 hour</option>
+            <option value="6">Last 6 hours</option>
+            <option value="24" selected>Last 24 hours</option>
+            <option value="168">Last 7 days</option>
+        </select>
+        <button id="reload">Reload</button>
+        <span class="sub" id="summary"></span>
+    </div>
+</div>
+<div class="panel">
+    <h2>Temperature (°C)</h2>
+    <div id="temperatureChart"></div>
+    <h2 style="margin-top: 12px">Humidity (%)</h2>
+    <div id="humidityChart"></div>
+    <div class="legend" id="legend"></div>
+    <h2 style="margin-top: 12px">Our outputs</h2>
+    <div id="controlChart"></div>
+</div>
+<div class="panel">
+    <h2>Sensors at cursor (latest reading at or before it)</h2>
+    <div id="sensorTable"></div>
+</div>
+<div class="panel">
+    <h2>Our outputs at cursor (latest command at or before it)</h2>
+    <div id="controlTable"></div>
+</div>
+<div class="panel">
+    <h2>Events around cursor</h2>
+    <div id="eventTable"></div>
+</div>
+<div class="panel">
+    <h2>Files</h2>
+    <div id="fileTable"></div>
+</div>
+<div id="tooltip"></div>
+<script>
+const SENSOR_NAMES = {
+    24: "outside",
+    154: "beside outside door",
+    225: "bathroom",
+    248: "microwave",
+    132: "beside computer",
+    211: "bedroom window",
+    173: "thermal limit",
+};
+const SERIES_COUNT = 8;
+const CONTROL_LANES = [
+    { name: "Humidifier", kinds: ["humidifier_plug_set"] },
+    { name: "Outside fan", kinds: ["outside_fan_plug_set"] },
+    { name: "Thermostat", kinds: ["thermostat_heat_set", "thermostat_cool_set", "thermostat_off_set"] },
+];
+const RESTART_KIND = "process_start";
+const CHART_HEIGHT = 170;
+const LANE_HEIGHT = 22;
+const LANE_GAP = 6;
+const MARGIN = { left: 44, right: 120, top: 8, bottom: 20 };
+const EVENTS_AROUND_CURSOR = 12;
+const PLAY_TICK = 100;
+const AXIS_TICKS = 6;
+const VALUE_TICKS = 4;
+
+let data;
+let sensors = [];
+let cursor = 0;
+let playing;
+
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[c]);
+}
+function formatClock(time) {
+    return new Date(time).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+function formatShortClock(time) {
+    return new Date(time).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+function formatAge(ms) {
+    let seconds = Math.round(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    let minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+    let hours = Math.floor(minutes / 60);
+    return `${hours}h ${minutes % 60}m`;
+}
+function formatValue(value) {
+    if (typeof value === "boolean") return value ? "on" : "off";
+    if (typeof value === "number") return String(value);
+    return typeof value === "string" ? value : JSON.stringify(value);
+}
+function describeControl(event) {
+    if (!event) return "";
+    let v = event.values;
+    if (event.kind === "thermostat_heat_set") return `heat to ${v.heating_set_point_celsius}°C`;
+    if (event.kind === "thermostat_cool_set") return `cool to ${v.cooling_set_point_celsius}°C`;
+    if (event.kind === "thermostat_off_set") return "off";
+    if ("on" in v) return v.on ? "on" : "off";
+    return JSON.stringify(v);
+}
+function controlIsOn(event) {
+    if (!event) return undefined;
+    if (event.kind === "thermostat_off_set") return false;
+    if (event.kind.startsWith("thermostat_")) return true;
+    return !!event.values.on;
+}
+function latestAtOrBefore(events, time) {
+    let low = 0;
+    let high = events.length - 1;
+    let found;
+    while (low <= high) {
+        let mid = (low + high) >> 1;
+        if (events[mid].values.time <= time) {
+            found = events[mid];
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+    return found;
+}
+
+async function load() {
+    let hours = Number(document.getElementById("hours").value);
+    let to = Date.now();
+    let from = to - hours * 3600 * 1000;
+    let response = await fetch(`events?from=${from}&to=${to}`);
+    if (!response.ok) {
+        document.getElementById("time").innerHTML = `<span class="error">${escapeHtml(await response.text())}</span>`;
+        return;
+    }
+    data = await response.json();
+    let ids = [...new Set(data.events.filter(e => e.kind === "sensor").map(e => e.values.id))].sort((a, b) => a - b);
+    sensors = ids.map((id, index) => ({
+        id,
+        color: index < SERIES_COUNT ? `var(--series-${index + 1})` : "var(--muted)",
+        events: data.events.filter(e => e.kind === "sensor" && e.values.id === id),
+    }));
+    for (let lane of CONTROL_LANES) {
+        lane.events = data.events.filter(e => lane.kinds.includes(e.kind));
+    }
+    let slider = document.getElementById("slider");
+    let range = getRange();
+    slider.min = range.min;
+    slider.max = range.max;
+    if (!cursor || cursor < range.min || cursor > range.max) {
+        cursor = range.max;
+    }
+    slider.value = cursor;
+    let bytes = data.files.reduce((sum, f) => sum + f.bytes, 0);
+    let fileEvents = data.files.reduce((sum, f) => sum + f.eventCount, 0);
+    document.getElementById("summary").textContent = `${data.events.length} events in range, ${data.files.length} files, ${bytes} bytes (${fileEvents ? (bytes / fileEvents).toFixed(1) : 0} bytes/event)`;
+    renderLegend();
+    renderFiles();
+    render();
+}
+
+function getRange() {
+    if (!data.events.length) {
+        return { min: data.from, max: data.to };
+    }
+    return { min: data.events[0].values.time, max: data.events[data.events.length - 1].values.time };
+}
+
+function chartWidth(container) {
+    return Math.max(320, container.clientWidth);
+}
+
+function makeScaleX(width) {
+    let range = getRange();
+    let span = Math.max(1, range.max - range.min);
+    let x = time => MARGIN.left + ((time - range.min) / span) * (width - MARGIN.left - MARGIN.right);
+    x.invert = px => range.min + ((px - MARGIN.left) / (width - MARGIN.left - MARGIN.right)) * span;
+    return x;
+}
+
+function timeAxis(x, width, y) {
+    let range = getRange();
+    let html = "";
+    for (let i = 0; i <= AXIS_TICKS; i++) {
+        let time = range.min + ((range.max - range.min) * i) / AXIS_TICKS;
+        html += `<text x="${x(time)}" y="${y}" text-anchor="middle">${escapeHtml(formatShortClock(time))}</text>`;
+    }
+    return html;
+}
+
+function restartMarks(x, top, bottom) {
+    return data.events.filter(e => e.kind === RESTART_KIND).map(e => `<line x1="${x(e.values.time)}" x2="${x(e.values.time)}" y1="${top}" y2="${bottom}" stroke="var(--muted)" stroke-dasharray="2 3"/>`).join("");
+}
+
+function lineChart(containerId, field, format) {
+    let container = document.getElementById(containerId);
+    let width = chartWidth(container);
+    let x = makeScaleX(width);
+    let values = [];
+    for (let sensor of sensors) {
+        for (let event of sensor.events) {
+            if (typeof event.values[field] === "number") values.push(event.values[field]);
+        }
+    }
+    if (!values.length) {
+        container.innerHTML = `<div class="sub">No ${escapeHtml(field)} readings in range</div>`;
+        return;
+    }
+    let min = Math.min(...values);
+    let max = Math.max(...values);
+    if (max - min < 1) {
+        min -= 0.5;
+        max += 0.5;
+    }
+    let plotBottom = CHART_HEIGHT - MARGIN.bottom;
+    let y = value => MARGIN.top + ((max - value) / (max - min)) * (plotBottom - MARGIN.top);
+    let html = `<svg viewBox="0 0 ${width} ${CHART_HEIGHT}" height="${CHART_HEIGHT}" data-chart="${field}">`;
+    for (let i = 0; i <= VALUE_TICKS; i++) {
+        let value = min + ((max - min) * i) / VALUE_TICKS;
+        html += `<line x1="${MARGIN.left}" x2="${width - MARGIN.right}" y1="${y(value)}" y2="${y(value)}" stroke="var(--grid)"/>`;
+        html += `<text x="${MARGIN.left - 6}" y="${y(value) + 4}" text-anchor="end">${escapeHtml(format(value))}</text>`;
+    }
+    html += restartMarks(x, MARGIN.top, plotBottom);
+    for (let sensor of sensors) {
+        let points = sensor.events.filter(e => typeof e.values[field] === "number");
+        if (!points.length) continue;
+        let path = points.map((e, i) => `${i ? "L" : "M"}${x(e.values.time).toFixed(1)},${y(e.values[field]).toFixed(1)}`).join("");
+        html += `<path d="${path}" fill="none" stroke="${sensor.color}" stroke-width="2" stroke-linejoin="round"/>`;
+        let at = latestAtOrBefore(points, cursor);
+        if (at) {
+            html += `<circle cx="${x(at.values.time)}" cy="${y(at.values[field])}" r="4" fill="${sensor.color}" stroke="var(--surface)" stroke-width="2"/>`;
+        }
+        let last = points[points.length - 1];
+        html += `<text class="label" x="${width - MARGIN.right + 6}" y="${y(last.values[field]) + 4}">${escapeHtml(sensor.id)} ${escapeHtml(SENSOR_NAMES[sensor.id] || "")}</text>`;
+    }
+    html += `<line x1="${x(cursor)}" x2="${x(cursor)}" y1="${MARGIN.top}" y2="${plotBottom}" stroke="var(--cursor)" stroke-width="1.5"/>`;
+    html += timeAxis(x, width, CHART_HEIGHT - 4);
+    html += `</svg>`;
+    container.innerHTML = html;
+    attachScrub(container.querySelector("svg"), x, width, field);
+}
+
+function controlChart() {
+    let container = document.getElementById("controlChart");
+    let width = chartWidth(container);
+    let x = makeScaleX(width);
+    let range = getRange();
+    let height = MARGIN.top + CONTROL_LANES.length * (LANE_HEIGHT + LANE_GAP) + MARGIN.bottom;
+    let html = `<svg viewBox="0 0 ${width} ${height}" height="${height}">`;
+    CONTROL_LANES.forEach((lane, index) => {
+        let top = MARGIN.top + index * (LANE_HEIGHT + LANE_GAP);
+        html += `<text class="label" x="${width - MARGIN.right + 6}" y="${top + LANE_HEIGHT / 2 + 4}">${escapeHtml(lane.name)}</text>`;
+        html += `<rect x="${MARGIN.left}" y="${top}" width="${width - MARGIN.left - MARGIN.right}" height="${LANE_HEIGHT}" fill="none" stroke="var(--grid)" rx="4"/>`;
+        lane.events.forEach((event, i) => {
+            let start = event.values.time;
+            let end = i + 1 < lane.events.length ? lane.events[i + 1].values.time : range.max;
+            let on = controlIsOn(event);
+            let segmentWidth = Math.max(1, x(end) - x(start) - 2);
+            html += `<rect x="${x(start)}" y="${top}" width="${segmentWidth}" height="${LANE_HEIGHT}" rx="4" fill="${on ? "var(--on)" : "var(--off)"}"><title>${escapeHtml(`${formatClock(start)}: ${describeControl(event)}`)}</title></rect>`;
+            html += `<line x1="${x(start)}" x2="${x(start)}" y1="${top}" y2="${top + LANE_HEIGHT}" stroke="var(--text)" stroke-width="1"/>`;
+        });
+        if (!lane.events.length) {
+            html += `<text x="${MARGIN.left + 6}" y="${top + LANE_HEIGHT / 2 + 4}">no commands in range</text>`;
+        }
+    });
+    let bottom = height - MARGIN.bottom;
+    html += restartMarks(x, MARGIN.top, bottom);
+    html += `<line x1="${x(cursor)}" x2="${x(cursor)}" y1="${MARGIN.top}" y2="${bottom}" stroke="var(--cursor)" stroke-width="1.5"/>`;
+    html += timeAxis(x, width, height - 4);
+    html += `</svg>`;
+    container.innerHTML = html;
+    attachScrub(container.querySelector("svg"), x, width);
+}
+
+function attachScrub(svg, x, width, field) {
+    let tooltip = document.getElementById("tooltip");
+    let toTime = event => {
+        let rect = svg.getBoundingClientRect();
+        let px = ((event.clientX - rect.left) / rect.width) * width;
+        let range = getRange();
+        return Math.min(range.max, Math.max(range.min, x.invert(px)));
+    };
+    svg.addEventListener("pointerdown", event => {
+        svg.setPointerCapture(event.pointerId);
+        setCursor(toTime(event));
+    });
+    svg.addEventListener("pointermove", event => {
+        let time = toTime(event);
+        if (event.buttons) {
+            setCursor(time);
+        }
+        let lines = [`<b>${escapeHtml(formatClock(time))}</b>`];
+        if (field) {
+            for (let sensor of sensors) {
+                let at = latestAtOrBefore(sensor.events, time);
+                if (!at || typeof at.values[field] !== "number") continue;
+                lines.push(`<span class="swatch" style="background:${sensor.color}"></span>${escapeHtml(sensor.id)} ${escapeHtml(SENSOR_NAMES[sensor.id] || "")}: ${escapeHtml(at.values[field])} (${escapeHtml(formatAge(time - at.values.time))} old)`);
+            }
+        } else {
+            for (let lane of CONTROL_LANES) {
+                let at = latestAtOrBefore(lane.events, time);
+                lines.push(`${escapeHtml(lane.name)}: ${at ? `${escapeHtml(describeControl(at))} (${escapeHtml(formatAge(time - at.values.time))} ago)` : "no command yet"}`);
+            }
+        }
+        tooltip.innerHTML = lines.join("<br>");
+        tooltip.style.display = "block";
+        let left = Math.min(event.clientX + 14, window.innerWidth - tooltip.offsetWidth - 8);
+        tooltip.style.left = `${Math.max(8, left)}px`;
+        tooltip.style.top = `${event.clientY + 14}px`;
+    });
+    svg.addEventListener("pointerleave", () => {
+        tooltip.style.display = "none";
+    });
+}
+
+function renderLegend() {
+    document.getElementById("legend").innerHTML = sensors.map(s => `<span><span class="swatch" style="background:${s.color}"></span>${escapeHtml(s.id)} ${escapeHtml(SENSOR_NAMES[s.id] || "")}</span>`).join("");
+}
+
+function renderSensorTable() {
+    let fields = [];
+    for (let sensor of sensors) {
+        for (let event of sensor.events) {
+            for (let key of Object.keys(event.values)) {
+                if (key !== "time" && key !== "id" && !fields.includes(key)) fields.push(key);
+            }
+        }
+    }
+    let rows = sensors.map(sensor => {
+        let at = latestAtOrBefore(sensor.events, cursor);
+        if (!at) {
+            return `<tr><td>${escapeHtml(sensor.id)}</td><td>${escapeHtml(SENSOR_NAMES[sensor.id] || "")}</td><td colspan="${fields.length + 2}" class="sub">no reading yet</td></tr>`;
+        }
+        let current = at.values.time === cursor ? "current" : "";
+        return `<tr class="${current}"><td>${escapeHtml(sensor.id)}</td><td>${escapeHtml(SENSOR_NAMES[sensor.id] || "")}</td><td>${escapeHtml(formatClock(at.values.time))}</td><td>${escapeHtml(formatAge(cursor - at.values.time))}</td>${fields.map(f => `<td>${f in at.values ? escapeHtml(formatValue(at.values[f])) : ""}</td>`).join("")}</tr>`;
+    });
+    document.getElementById("sensorTable").innerHTML = sensors.length ? `<table><tr><th>id</th><th>name</th><th>reading time</th><th>age</th>${fields.map(f => `<th>${escapeHtml(f)}</th>`).join("")}</tr>${rows.join("")}</table>` : `<div class="sub">No sensor readings in range</div>`;
+}
+
+function renderControlTable() {
+    let rows = CONTROL_LANES.map(lane => {
+        let at = latestAtOrBefore(lane.events, cursor);
+        if (!at) {
+            return `<tr><td>${escapeHtml(lane.name)}</td><td colspan="4" class="sub">no command yet</td></tr>`;
+        }
+        let current = at.values.time === cursor ? "current" : "";
+        return `<tr class="${current}"><td>${escapeHtml(lane.name)}</td><td>${escapeHtml(describeControl(at))}</td><td>${escapeHtml(at.kind)}</td><td>${escapeHtml(formatClock(at.values.time))}</td><td>${escapeHtml(formatAge(cursor - at.values.time))} ago</td></tr>`;
+    });
+    let restart = latestAtOrBefore(data.events.filter(e => e.kind === RESTART_KIND), cursor);
+    if (restart) {
+        rows.push(`<tr><td>Last restart</td><td>pid ${escapeHtml(restart.values.pid)}</td><td>${RESTART_KIND}</td><td>${escapeHtml(formatClock(restart.values.time))}</td><td>${escapeHtml(formatAge(cursor - restart.values.time))} ago</td></tr>`);
+    }
+    document.getElementById("controlTable").innerHTML = `<table><tr><th>output</th><th>value</th><th>kind</th><th>sent</th><th>age</th></tr>${rows.join("")}</table>`;
+}
+
+function renderEventTable() {
+    let events = data.events;
+    let index = events.findIndex(e => e.values.time > cursor);
+    if (index === -1) index = events.length;
+    let start = Math.max(0, index - EVENTS_AROUND_CURSOR);
+    let slice = events.slice(start, Math.min(events.length, index + EVENTS_AROUND_CURSOR));
+    let rows = slice.map(event => {
+        let details = Object.entries(event.values).filter(([key]) => key !== "time").map(([key, value]) => `${key}=${formatValue(value)}`).join(" ");
+        let current = event.values.time === cursor ? "current" : "";
+        return `<tr class="${current}" data-time="${event.values.time}" style="cursor: pointer"><td>${escapeHtml(formatClock(event.values.time))}</td><td>${escapeHtml(event.kind)}</td><td>${escapeHtml(details)}</td></tr>`;
+    });
+    let table = document.getElementById("eventTable");
+    table.innerHTML = slice.length ? `<table><tr><th>time</th><th>kind</th><th>values</th></tr>${rows.join("")}</table>` : `<div class="sub">No events in range</div>`;
+    for (let row of table.querySelectorAll("tr[data-time]")) {
+        row.addEventListener("click", () => setCursor(Number(row.dataset.time)));
+    }
+}
+
+function renderFiles() {
+    let rows = data.files.map(file => `<tr><td>${escapeHtml(file.name)}</td><td>${file.bytes}</td><td>${file.eventCount}</td><td>${file.eventCount ? (file.bytes / file.eventCount).toFixed(1) : ""}</td><td>${escapeHtml(file.header.reason)}</td><td>${file.truncatedBytes ? `<span class="error">${file.truncatedBytes} partial bytes</span>` : ""}</td><td>${escapeHtml(file.types.map(t => `${t.typeId}:${t.kind}(${t.fields.map(f => `${f.name}:${f.type}`).join(", ")})`).join(" · "))}</td></tr>`);
+    document.getElementById("fileTable").innerHTML = data.files.length ? `<table><tr><th>file</th><th>bytes</th><th>events</th><th>bytes/event</th><th>opened because</th><th></th><th>schema</th></tr>${rows.join("")}</table>` : `<div class="sub">No recording files in range</div>`;
+}
+
+function render() {
+    if (!data) return;
+    let range = getRange();
+    document.getElementById("time").textContent = formatClock(cursor);
+    document.getElementById("timeSub").textContent = `${formatAge(range.max - cursor)} before the last event · range ${formatClock(range.min)} to ${formatClock(range.max)}`;
+    lineChart("temperatureChart", "temperature_C", value => value.toFixed(1));
+    lineChart("humidityChart", "humidity", value => value.toFixed(0));
+    controlChart();
+    renderSensorTable();
+    renderControlTable();
+    renderEventTable();
+}
+
+function setCursor(time) {
+    let range = getRange();
+    cursor = Math.min(range.max, Math.max(range.min, time));
+    document.getElementById("slider").value = cursor;
+    render();
+}
+
+function stepEvent(direction) {
+    let events = data.events;
+    if (!events.length) return;
+    if (direction > 0) {
+        let next = events.find(e => e.values.time > cursor);
+        if (next) setCursor(next.values.time);
+    } else {
+        let previous = [...events].reverse().find(e => e.values.time < cursor);
+        if (previous) setCursor(previous.values.time);
+    }
+}
+
+function togglePlay() {
+    let button = document.getElementById("play");
+    if (playing) {
+        clearInterval(playing);
+        playing = undefined;
+        button.textContent = "Play";
+        return;
+    }
+    let range = getRange();
+    if (cursor >= range.max) {
+        setCursor(range.min);
+    }
+    button.textContent = "Pause";
+    playing = setInterval(() => {
+        let speed = Number(document.getElementById("speed").value);
+        setCursor(cursor + PLAY_TICK * speed);
+        if (cursor >= getRange().max) {
+            togglePlay();
+        }
+    }, PLAY_TICK);
+}
+
+document.getElementById("slider").addEventListener("input", event => setCursor(Number(event.target.value)));
+document.getElementById("prev").addEventListener("click", () => stepEvent(-1));
+document.getElementById("next").addEventListener("click", () => stepEvent(1));
+document.getElementById("play").addEventListener("click", togglePlay);
+document.getElementById("reload").addEventListener("click", load);
+document.getElementById("hours").addEventListener("change", load);
+document.addEventListener("keydown", event => {
+    if (event.target.tagName === "SELECT") return;
+    if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        stepEvent(-1);
+    } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        stepEvent(1);
+    }
+});
+window.addEventListener("resize", render);
+load().catch(error => {
+    document.getElementById("time").innerHTML = `<span class="error">${escapeHtml(error.stack || error)}</span>`;
+});
+</script>
+</body>
+</html>

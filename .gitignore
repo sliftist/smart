@@ -50,4 +50,5 @@ package-lock.json
 Thumbs.db
 
 logs
+recordings
 *.temp

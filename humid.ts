@@ -7,6 +7,8 @@ import { getThermostat, setHeatingTemperature, setCoolingTemperature, setThermos
 import { dailyCallback } from "./scheduler";
 import { runInfinitePoll, runInfinitePollCallAtStart } from "socket-function/src/batching";
 import { WebSocketServer, WebSocket } from "ws";
+import { recordEvent, recordSensorReadings, startRecording } from "./recording";
+import { startRecordingViewerServer } from "./recordingViewer";
 
 /*
 24 outside
@@ -179,6 +181,8 @@ function startStatusServer() {
 
 async function main() {
     startStatusServer();
+    await startRecording();
+    startRecordingViewerServer();
     function iterateForked<T>(iterable: AsyncIterable<T>, handler: (item: T) => void) {
         void (async () => {
             for await (const item of iterable) {
@@ -190,7 +194,7 @@ async function main() {
     }
     iterateForked(watchDirectory("logs"), (file) => {
         objectsToObservable(
-            linesToObjects(watchFile(file)),
+            recordSensorReadings(linesToObjects(watchFile(file))),
             allData,
             (object) => object.id,
             (object) => {
@@ -219,11 +223,8 @@ async function main() {
         controlState.humidifierOn = on;
         controlState.humidifierReason = reason;
         paused.value = true;
-        if (on) {
-            void PLUG.setOn(true);
-        } else {
-            void PLUG.setOn(false);
-        }
+        recordEvent("humidifier_plug_set", { time: Date.now(), on });
+        void PLUG.setOn(on);
         setTimeout(() => {
             paused.value = false;
         }, THROTTLE_TIME);
@@ -362,6 +363,7 @@ async function main() {
             let previousMode = info.properties.current_climate_setting.hvac_mode_setting;
             if (previousMode === "off") return;
             console.log(`[pid ${process.pid}] Turning thermostat off (was ${previousMode}, room ${info.properties.temperature_celsius}C on the ecobee) at ${formatNiceDateTime(Date.now())}`);
+            recordEvent("thermostat_off_set", { time: Date.now() });
             await setThermostatOff();
         }
 
@@ -381,6 +383,7 @@ async function main() {
                     console.warn(`Tried to set heating set point too high (${curTemp}C), limiting to ${HEATING_SET_POINT_MAX}C`);
                     curTemp = HEATING_SET_POINT_MAX;
                 }
+                recordEvent("thermostat_heat_set", { time: Date.now(), heating_set_point_celsius: curTemp });
                 await setHeatingTemperature(curTemp);
                 recordSetPoint("heating", curTemp);
             }
@@ -389,6 +392,7 @@ async function main() {
             }
             async function setSuperCooling(status: boolean, reason: string) {
                 console.log(JSON.stringify({ id: OUR_THERMOSTAT_ID, time: Date.now(), super_cooling: status }));
+                recordEvent("outside_fan_plug_set", { time: Date.now(), on: status });
                 await SUPER_COOLING_PLUG.setOn(status);
                 controlState.superCooling = status;
                 controlState.superCoolingReason = reason;
@@ -451,6 +455,7 @@ async function main() {
                     console.warn(`Tried to set cooling set point too low (${curTemp}C), limiting to ${COOLING_SET_POINT_MIN}C`);
                     curTemp = COOLING_SET_POINT_MIN;
                 }
+                recordEvent("thermostat_cool_set", { time: Date.now(), cooling_set_point_celsius: curTemp });
                 await setCoolingTemperature(curTemp);
                 recordSetPoint("cooling", curTemp);
             }
