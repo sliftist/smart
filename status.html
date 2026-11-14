@@ -75,6 +75,22 @@
         padding: 10px 12px;
         min-width: 0;
     }
+    .card.humidity-warning {
+        animation-name: humidity-flash;
+        animation-timing-function: steps(1, end);
+        animation-iteration-count: infinite;
+        color: #0b0b0b;
+    }
+    @keyframes humidity-flash {
+        0% {
+            background: #fab219;
+            border-color: #fab219;
+        }
+        50% {
+            background: #d03b3b;
+            border-color: #d03b3b;
+        }
+    }
     .wide {
         grid-column: 1 / -1;
     }
@@ -226,6 +242,8 @@ const AGE_REFRESH_INTERVAL = 1000;
 const TEMPERATURE_PADDING = 2;
 const MARKER_PADDING = 1;
 const HUMIDITY_PADDING = 10;
+const HUMIDITY_WARNING_DIFFERENCE = 5;
+const HUMIDITY_FLASH_PERIOD = 1000;
 
 let params = new URLSearchParams(location.search);
 let host = params.get("host") || location.hostname || DEFAULT_HOST;
@@ -255,8 +273,8 @@ function onOff(value) {
 function row(label, value) {
     return `<div class="row"><span class="label">${escapeHtml(label)}</span><span>${value}</span></div>`;
 }
-function card(title, body, className = "") {
-    return `<div class="card ${className}">${title ? `<h2>${escapeHtml(title)}</h2>` : ""}${body}</div>`;
+function card(title, body, className = "", style = "") {
+    return `<div class="card ${className}" style="${style}">${title ? `<h2>${escapeHtml(title)}</h2>` : ""}${body}</div>`;
 }
 function isOff(value) {
     return value !== undefined && !value;
@@ -404,6 +422,7 @@ function render() {
 
     let humidityRange = rangeFor([status.humidityTarget], HUMIDITY_PADDING, [humiditySensor.humidity]);
     let formatHumidity = value => `${Math.round(value)}%`;
+    let humidityWarning = typeof humiditySensor.humidity === "number" && Math.abs(humiditySensor.humidity - status.humidityTarget) > HUMIDITY_WARNING_DIFFERENCE;
     cards.push(card("", `
         <h3>Humidity (#${escapeHtml(humiditySensor.id || "?")})</h3>
         ${scaleChart({
@@ -418,7 +437,7 @@ function render() {
             markers: [{ value: humiditySensor.humidity, label: "Humidity", stale: isStale(humiditySensor.time) }],
         })}
         <div class="reason">${escapeHtml(control.humidifierReason || "")}</div>
-    `));
+    `, humidityWarning ? "humidity-warning" : "", humidityWarning ? `animation-duration: ${HUMIDITY_FLASH_PERIOD}ms; animation-delay: -${Date.now() % HUMIDITY_FLASH_PERIOD}ms` : ""));
     document.getElementById("content").innerHTML = cards.join("");
 
     let thermalLimit = sensor("thermal limit") || {};
