@@ -56,13 +56,13 @@ const TEMPERATURE_POLL_RATE = timeInMinute * 2.5;
 const SUPER_COOLING_PLUG = PlugNine;
 const SUPER_COOLING_TEMPERATURE_THRESHOLD = 3;
 const OUTSIDE_SENSOR = "24";
-const SUPER_COOLING_OUTSIDE_THRESHOLD = 4;
+const SUPER_COOLING_OUTSIDE_THRESHOLD = 2;
 
 // TODO: Adjust the temperature targets slightly based on outside temperatures.
 let TEMPERATURE_PLAN = [
-    { time: 0, temperature: 20 },
-    { time: 9.5, temperature: 20 },
-    { time: 12.5, temperature: 20 },
+    { time: 0, temperature: 22 },
+    { time: 9.5, temperature: 22 },
+    { time: 12.5, temperature: 22 },
 ];
 
 
