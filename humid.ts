@@ -60,9 +60,9 @@ const SUPER_COOLING_OUTSIDE_THRESHOLD = 2;
 
 // TODO: Adjust the temperature targets slightly based on outside temperatures.
 let TEMPERATURE_PLAN = [
-    { time: 0, temperature: 22 },
-    { time: 9.5, temperature: 22 },
-    { time: 12.5, temperature: 22 },
+    { time: 0, temperature: 21.5 },
+    { time: 9.5, temperature: 21.5 },
+    { time: 12.5, temperature: 21.5 },
 ];
 
 
