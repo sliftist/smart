@@ -4,7 +4,86 @@ import * as fs from "fs";
 import * as os from "os";
 import * as childProcess from "child_process";
 
+const ARP_TABLE_PATH = "/proc/net/arp";
+const PING_TIMEOUT_SECONDS = 1;
+const MAX_SWEEP_HOSTS = 1024;
 
+function normalizeMac(mac: string) {
+    return mac.replace(/[^0-9a-f]/gi, "").toLowerCase();
+}
+
+async function readArpTable(): Promise<Map<string, string>> {
+    let table = new Map<string, string>();
+    let contents = await fs.promises.readFile(ARP_TABLE_PATH, "utf8");
+    for (let line of contents.split("\n").slice(1)) {
+        let [ip, , flags, mac] = line.trim().split(/\s+/);
+        if (!ip || !mac || flags === "0x0") continue;
+        table.set(normalizeMac(mac), ip);
+    }
+    return table;
+}
+
+function ipToNumber(ip: string) {
+    return ip.split(".").reduce((value, part) => value * 256 + Number(part), 0);
+}
+function numberToIp(value: number) {
+    return [24, 16, 8, 0].map(shift => Math.floor(value / 2 ** shift) % 256).join(".");
+}
+
+function getSweepAddresses(): string[] {
+    let addresses: string[] = [];
+    for (let entries of Object.values(os.networkInterfaces())) {
+        for (let entry of entries || []) {
+            if (entry.family !== "IPv4" || entry.internal) continue;
+            let mask = ipToNumber(entry.netmask);
+            let hostCount = 2 ** 32 - mask;
+            if (hostCount > MAX_SWEEP_HOSTS) {
+                console.warn(`[pid ${process.pid}] Not sweeping ${entry.address}/${entry.netmask} for plugs, ${hostCount} addresses is more than the max of ${MAX_SWEEP_HOSTS}`);
+                continue;
+            }
+            let network = ipToNumber(entry.address) - (ipToNumber(entry.address) % hostCount);
+            for (let host = 1; host < hostCount - 1; host++) {
+                addresses.push(numberToIp(network + host));
+            }
+        }
+    }
+    return addresses;
+}
+
+function ping(ip: string): Promise<void> {
+    return new Promise(resolve => {
+        let child = childProcess.spawn("ping", ["-c", "1", "-W", String(PING_TIMEOUT_SECONDS), ip], { stdio: "ignore" });
+        child.on("error", () => resolve());
+        child.on("exit", () => resolve());
+    });
+}
+
+let sweepInProgress: Promise<void> | undefined;
+function sweepNetwork(): Promise<void> {
+    if (!sweepInProgress) {
+        sweepInProgress = (async () => {
+            let addresses = getSweepAddresses();
+            await Promise.all(addresses.map(ping));
+        })().finally(() => {
+            sweepInProgress = undefined;
+        });
+    }
+    return sweepInProgress;
+}
+
+async function resolvePlugIp(deviceMac: string): Promise<string> {
+    let mac = normalizeMac(deviceMac);
+    let ip = (await readArpTable()).get(mac);
+    if (ip) return ip;
+    let start = Date.now();
+    await sweepNetwork();
+    ip = (await readArpTable()).get(mac);
+    if (!ip) {
+        throw new Error(`Plug ${deviceMac} is not in ${ARP_TABLE_PATH}, even after pinging every address on the local network (took ${Date.now() - start}ms). It is probably unplugged or off the network`);
+    }
+    console.log(`[pid ${process.pid}] Plug ${deviceMac} was not in ${ARP_TABLE_PATH}, found it at ${ip} after pinging the local network (took ${Date.now() - start}ms)`);
+    return ip;
+}
 
 export const getPlugCreds = lazy(async () => {
     let contents = await fs.promises.readFile(os.homedir() + "/tplink.json", "utf8");
@@ -18,7 +97,10 @@ export class Plug {
     constructor(public readonly deviceMac: string) { }
     private async getDevice() {
         let creds = await getPlugCreds();
-        return await tsplinkconnect.loginDevice(creds.email, creds.password, { deviceMac: this.deviceMac } as any);
+        if (!fs.existsSync(ARP_TABLE_PATH)) {
+            return await tsplinkconnect.loginDevice(creds.email, creds.password, { deviceMac: this.deviceMac } as any);
+        }
+        return await tsplinkconnect.loginDeviceByIp(creds.email, creds.password, await resolvePlugIp(this.deviceMac));
     }
     public async getInfo(): Promise<{
         device_on: boolean;
